@@ -15,7 +15,6 @@ Once Helm is set up properly, add the repo as follows:
 ```shell
 helm repo add thatmlopsguy https://thatmlopsguy.github.io/helm-charts 
 helm repo update
-
 ```
 
 You can then run `helm search repo thatmlopsguy` to see the current list of available charts.
