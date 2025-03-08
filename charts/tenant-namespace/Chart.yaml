@@ -2,7 +2,7 @@ apiVersion: v2
 name: tenant-namespace
 description: A Helm Chart to bootstrap a Namespace in a Multi-Tenancy setup
 type: application
-version: 0.1.4
+version: 0.1.5
 home: https://github.com/thatmlopsguy/helm-charts
 maintainers:
   - name: thatmlopsguy
