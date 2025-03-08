@@ -5,3 +5,4 @@ check-version-increment: true
 debug: true
 chart-dirs:
   - charts
+validate-maintainers: false
