@@ -4,4 +4,3 @@ description: A Helm Chart to bootstrap a Namespace in a Multi-Tenancy setup
 type: application
 version: 0.1.0
 home: https://github.com/thatmlopsguy/helm-charts
-
