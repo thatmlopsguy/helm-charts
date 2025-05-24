@@ -1,5 +1,16 @@
 apiVersion: v1
 entries:
+  metallb-extras:
+  - apiVersion: v2
+    appVersion: 1.16.0
+    created: "2025-05-24T09:11:13.085989234Z"
+    description: A Helm chart for Kubernetes
+    digest: cdc5f798dc800fc90ab9632b0e40c69f52e1b3e3662473e59e833d3d96573177
+    name: metallb-extras
+    type: application
+    urls:
+    - https://github.com/thatmlopsguy/helm-charts/releases/download/metallb-extras-0.1.0/metallb-extras-0.1.0.tgz
+    version: 0.1.0
   tenant-namespace:
   - apiVersion: v2
     created: "2025-03-08T22:05:12.871310781Z"
@@ -63,4 +74,4 @@ entries:
     urls:
     - https://github.com/thatmlopsguy/helm-charts/releases/download/tenant-namespace-0.1.1/tenant-namespace-0.1.1.tgz
     version: 0.1.1
-generated: "2025-03-08T22:05:12.871328854Z"
+generated: "2025-05-24T09:11:13.086008029Z"
