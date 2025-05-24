@@ -1,5 +1,16 @@
 apiVersion: v1
 entries:
+  cert-manager-extras:
+  - apiVersion: v2
+    appVersion: v0.1.0
+    created: "2025-05-24T10:24:21.829705624Z"
+    description: A Helm chart to install a Cert Manager CA
+    digest: e1646285b9a98ecaf20c77c7aee9e3872302e41b2c37264f72a2316c37a61897
+    name: cert-manager-extras
+    type: application
+    urls:
+    - https://github.com/thatmlopsguy/helm-charts/releases/download/cert-manager-extras-0.1.0/cert-manager-extras-0.1.0.tgz
+    version: 0.1.0
   metallb-extras:
   - apiVersion: v2
     appVersion: 1.16.0
@@ -74,4 +85,4 @@ entries:
     urls:
     - https://github.com/thatmlopsguy/helm-charts/releases/download/tenant-namespace-0.1.1/tenant-namespace-0.1.1.tgz
     version: 0.1.1
-generated: "2025-05-24T09:11:13.086008029Z"
+generated: "2025-05-24T10:24:21.829731022Z"
