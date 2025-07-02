@@ -8,5 +8,3 @@ github:
       description: Another repository description
       visibility: private
       gitignoreTemplate: Go
-      allowMergeCommit: false
-      secretScanningStatus: disabled

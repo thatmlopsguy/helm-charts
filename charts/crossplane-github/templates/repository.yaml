@@ -18,10 +18,6 @@ spec:
     allowMergeCommit: {{ .allowMergeCommit | default true }}
     allowRebaseMerge: {{ .allowRebaseMerge | default true }}
     allowSquashMerge: {{ .allowSquashMerge | default true }}
-    mergeCommitMessage: {{ .mergeCommitMessage | default "MERGE_MESSAGE" }}
-    mergeCommitTitle: {{ .mergeCommitTitle | default "MERGE_MESSAGE" }}
-    squashMergeCommitMessage: {{ .squashMergeCommitMessage | default "COMMIT_MESSAGES" }}
-    squashMergeCommitTitle: {{ .squashMergeCommitTitle | default "COMMIT_OR_PR_TITLE" }}
     securityAndAnalysis:
     - secretScanning:
       - status: {{ .secretScanningStatus | default "enabled" }}
