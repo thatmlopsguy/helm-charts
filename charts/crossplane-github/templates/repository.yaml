@@ -1,0 +1,32 @@
+{{- range .Values.github.repositories }}
+apiVersion: repo.github.upbound.io/v1alpha1
+kind: Repository
+metadata:
+  name: {{ .name }}
+  namespace: crossplane-system
+  annotations:
+    meta.upbound.io/example-id: repo/v1alpha1/repositoryruleset
+  labels:
+    crossplane.io/managed-by: upjet
+    testing.upbound.io/example-name: example
+spec:
+  forProvider:
+    name: {{ .name }}
+    description: {{ .description | default "Repository managed by Crossplane" }}
+    visibility: {{ .visibility | default "public" }}
+    gitignoreTemplate: {{ .gitignoreTemplate | default "Terraform" }}
+    allowMergeCommit: {{ .allowMergeCommit | default true }}
+    allowRebaseMerge: {{ .allowRebaseMerge | default true }}
+    allowSquashMerge: {{ .allowSquashMerge | default true }}
+    mergeCommitMessage: {{ .mergeCommitMessage | default "MERGE_MESSAGE" }}
+    mergeCommitTitle: {{ .mergeCommitTitle | default "MERGE_MESSAGE" }}
+    squashMergeCommitMessage: {{ .squashMergeCommitMessage | default "COMMIT_MESSAGES" }}
+    squashMergeCommitTitle: {{ .squashMergeCommitTitle | default "COMMIT_OR_PR_TITLE" }}
+    securityAndAnalysis:
+    - secretScanning:
+      - status: {{ .secretScanningStatus | default "enabled" }}
+      secretScanningPushProtection:
+      - status: {{ .secretScanningPushProtectionStatus | default "enabled" }}
+  providerConfigRef:
+    name: github-providerconfig
+{{- end }}
