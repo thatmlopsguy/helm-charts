@@ -1,4 +1,5 @@
 {{- range .Values.github.repositories }}
+---
 apiVersion: repo.github.upbound.io/v1alpha1
 kind: Repository
 metadata:
@@ -15,14 +16,6 @@ spec:
     description: {{ .description | default "Repository managed by Crossplane" }}
     visibility: {{ .visibility | default "public" }}
     gitignoreTemplate: {{ .gitignoreTemplate | default "Terraform" }}
-    allowMergeCommit: {{ .allowMergeCommit | default true }}
-    allowRebaseMerge: {{ .allowRebaseMerge | default true }}
-    allowSquashMerge: {{ .allowSquashMerge | default true }}
-    securityAndAnalysis:
-    - secretScanning:
-      - status: {{ .secretScanningStatus | default "false" }}
-      secretScanningPushProtection:
-      - status: {{ .secretScanningPushProtectionStatus | default "false" }}
   providerConfigRef:
     name: github-providerconfig
 {{- end }}
