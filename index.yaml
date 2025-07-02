@@ -14,6 +14,16 @@ entries:
   crossplane-github:
   - apiVersion: v2
     appVersion: v0.18.0
+    created: "2025-07-02T20:46:27.430941117Z"
+    description: A Helm chart to install crossplane-github provider
+    digest: aeffc14f04e69fc83a15829ad09cbc094183495ecca54456f611180dd86c6381
+    name: crossplane-github
+    type: application
+    urls:
+    - https://github.com/thatmlopsguy/helm-charts/releases/download/crossplane-github-0.1.1/crossplane-github-0.1.1.tgz
+    version: 0.1.1
+  - apiVersion: v2
+    appVersion: v0.18.0
     created: "2025-07-02T20:32:55.502809708Z"
     description: A Helm chart to install crossplane-github provider
     digest: 23a5e1750f8d1ca45ac122d7d47982e096b43ce111a602485d3849bd81688b6e
@@ -96,4 +106,4 @@ entries:
     urls:
     - https://github.com/thatmlopsguy/helm-charts/releases/download/tenant-namespace-0.1.1/tenant-namespace-0.1.1.tgz
     version: 0.1.1
-generated: "2025-07-02T20:32:55.502830337Z"
+generated: "2025-07-02T20:46:27.430962658Z"
