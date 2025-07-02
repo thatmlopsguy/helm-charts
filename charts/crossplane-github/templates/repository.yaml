@@ -20,9 +20,9 @@ spec:
     allowSquashMerge: {{ .allowSquashMerge | default true }}
     securityAndAnalysis:
     - secretScanning:
-      - status: {{ .secretScanningStatus | default "enabled" }}
+      - status: {{ .secretScanningStatus | default "false" }}
       secretScanningPushProtection:
-      - status: {{ .secretScanningPushProtectionStatus | default "enabled" }}
+      - status: {{ .secretScanningPushProtectionStatus | default "false" }}
   providerConfigRef:
     name: github-providerconfig
 {{- end }}
