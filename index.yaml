@@ -11,6 +11,17 @@ entries:
     urls:
     - https://github.com/thatmlopsguy/helm-charts/releases/download/cert-manager-extras-0.1.0/cert-manager-extras-0.1.0.tgz
     version: 0.1.0
+  crossplane-github:
+  - apiVersion: v2
+    appVersion: v0.18.0
+    created: "2025-07-02T20:32:55.502809708Z"
+    description: A Helm chart to install crossplane-github provider
+    digest: 23a5e1750f8d1ca45ac122d7d47982e096b43ce111a602485d3849bd81688b6e
+    name: crossplane-github
+    type: application
+    urls:
+    - https://github.com/thatmlopsguy/helm-charts/releases/download/crossplane-github-0.1.0/crossplane-github-0.1.0.tgz
+    version: 0.1.0
   metallb-extras:
   - apiVersion: v2
     appVersion: 1.16.0
@@ -85,4 +96,4 @@ entries:
     urls:
     - https://github.com/thatmlopsguy/helm-charts/releases/download/tenant-namespace-0.1.1/tenant-namespace-0.1.1.tgz
     version: 0.1.1
-generated: "2025-05-24T10:24:21.829731022Z"
+generated: "2025-07-02T20:32:55.502830337Z"
