@@ -13,7 +13,7 @@ Helm Charts for various Applications
 Once Helm is set up properly, add the repo as follows:
 
 ```shell
-helm repo add thatmlopsguy https://thatmlopsguy.github.io/helm-charts 
+helm repo add thatmlopsguy https://thatmlopsguy.github.io/helm-charts
 helm repo update
 
 ```

@@ -1,0 +1,12 @@
+github:
+  repositories:
+    - name: hello-provider-github-crossplane
+      description: My awesome codebase created by crossplane provider
+      visibility: public
+      gitignoreTemplate: Terraform
+    - name: another-repo
+      description: Another repository description
+      visibility: private
+      gitignoreTemplate: Go
+      allowMergeCommit: false
+      secretScanningStatus: disabled
