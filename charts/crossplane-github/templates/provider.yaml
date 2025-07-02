@@ -4,4 +4,4 @@ metadata:
   name: provider-upjet-github
   namespace: crossplane-system
 spec:
-  package: "crossplane-contrib/provider-upjet-github:{{ .Release.AppVersion }}"
+  package: crossplane-contrib/provider-upjet-github:{{ .Chart.AppVersion }}
