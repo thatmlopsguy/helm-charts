@@ -14,10 +14,8 @@ repos:
         args: [--allow-multiple-documents]
         exclude: ^charts/.*/templates/
   - repo: https://github.com/norwoodj/helm-docs
-    rev: "v1.14.2"
+    rev: v1.14.2
     hooks:
       - id: helm-docs
-        always_run: true
-        entry: jnorwood/helm-docs:v1.14.2
         args:
           - --chart-search-root=charts
