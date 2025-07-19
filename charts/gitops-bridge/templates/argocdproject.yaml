@@ -1,0 +1,39 @@
+{{- if .Values.argocdproject.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: {{ .Values.argocdproject.name }}
+  namespace: {{ .Values.argocdproject.namespace }}
+  labels:
+    {{- include "gitops-bridge.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  description: {{ .Values.argocdproject.description | quote }}
+
+  # Source repositories where applications can be deployed from
+  sourceRepos:
+    - '*'
+
+  # Destination clusters and namespaces where applications can be deployed
+  destinations:
+    - namespace: '*'
+      server: '*'
+
+  # Cluster resource whitelist - allows all resources
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+
+  # Namespace resource whitelist - allows all resources in namespaces
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+
+  # Sync windows (optional - allows sync at any time by default)
+  syncWindows: []
+
+  # Orphaned resources monitoring
+  orphanedResources:
+    warn: true
+{{- end }}
