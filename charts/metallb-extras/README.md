@@ -4,6 +4,12 @@
 
 A Helm chart for Kubernetes
 
+## Maintainers
+
+| Name | Email | Url |
+| ---- | ------ | --- |
+| thatmlopsguy |  | <https://thatmlopsguy.github.io> |
+
 ## Values
 
 | Key | Type | Default | Description |
