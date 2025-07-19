@@ -6,6 +6,8 @@ on:
   push:
     paths:
       - 'charts/**'
+      - '!charts/**/README.md'
+
 
 jobs:
   lint-test:
