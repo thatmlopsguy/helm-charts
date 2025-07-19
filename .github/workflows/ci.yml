@@ -8,8 +8,10 @@ on:
       - 'charts/**'
       - '!charts/**/README.md'
 
-
 jobs:
+  check-codeowners:
+    uses: ./.github/workflows/check-codeowners.yml
+
   lint-test:
     runs-on: ubuntu-latest
     steps:
