@@ -4,3 +4,6 @@ description: A Helm chart to install a Cert Manager CA
 type: application
 version: 0.1.0
 appVersion: v0.1.0
+maintainers:
+  - name: thatmlopsguy
+    url: https://thatmlopsguy.github.io

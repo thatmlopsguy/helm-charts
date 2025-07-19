@@ -1,8 +1,14 @@
 # crossplane-github
 
-![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: v0.18.0](https://img.shields.io/badge/AppVersion-v0.18.0-informational?style=flat-square)
+![Version: 0.1.4](https://img.shields.io/badge/Version-0.1.4-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: v0.18.0](https://img.shields.io/badge/AppVersion-v0.18.0-informational?style=flat-square)
 
 A Helm chart to install crossplane-github provider
+
+## Maintainers
+
+| Name | Email | Url |
+| ---- | ------ | --- |
+| thatmlopsguy |  | <https://thatmlopsguy.github.io> |
 
 ## Values
 
@@ -12,11 +18,9 @@ A Helm chart to install crossplane-github provider
 | github.repositories[0].gitignoreTemplate | string | `"Terraform"` |  |
 | github.repositories[0].name | string | `"hello-provider-github-crossplane"` |  |
 | github.repositories[0].visibility | string | `"public"` |  |
-| github.repositories[1].allowMergeCommit | bool | `false` |  |
 | github.repositories[1].description | string | `"Another repository description"` |  |
 | github.repositories[1].gitignoreTemplate | string | `"Go"` |  |
 | github.repositories[1].name | string | `"another-repo"` |  |
-| github.repositories[1].secretScanningStatus | string | `"disabled"` |  |
 | github.repositories[1].visibility | string | `"private"` |  |
 
 ----------------------------------------------

@@ -1,0 +1,7 @@
+# Ignore specific charts or directories
+# charts/example-chart/
+# charts/*/templates/tests/
+
+# Ignore specific files
+# **/values-dev.yaml
+# **/secrets.yaml

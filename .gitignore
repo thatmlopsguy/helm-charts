@@ -25,4 +25,7 @@ charts/**/Chart.lock
 # Support for Project snippet scope
 !.vscode/*.code-snippets
 
+# argocd
+.argocd/
+
 # End of https://www.toptal.com/developers/gitignore/api/helm,visualstudiocode
