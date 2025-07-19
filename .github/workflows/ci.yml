@@ -6,7 +6,7 @@ on:
   push:
     paths:
       - 'charts/**'
-
+      - '!charts/**/README.md'
 
 jobs:
   check-codeowners:
