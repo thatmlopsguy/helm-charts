@@ -5,7 +5,7 @@
 # The project is used to group applications that are related to addons
 argocdproject:
   enabled: true
-  name: addons
+  name: infra-addons
   namespace: argocd
   description: "Project for managing addon applications"
 
