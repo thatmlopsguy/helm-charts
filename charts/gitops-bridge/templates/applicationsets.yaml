@@ -10,20 +10,17 @@ spec:
   syncPolicy:
     preserveResourcesOnDeletion: false
   generators:
-    - merge:
-        mergeKeys: [server]
-        generators:
-          - clusters:
-              values:
-                addonChart: {{ $addons.chartName }}
-                addonChartVersion: {{ $addons.chartVersion }}
-                addonChartRepository: {{ $addons.chartRepository }}
-                addonChartNamespace: {{ $addons.namespace }}
-            selector:
-              matchExpressions:
-                - key: enable_{{ $addons.chartName }}
-                  operator: In
-                  values: ['true']
+    - clusters:
+        values:
+          addonChart: {{ $addons.chartName }}
+          addonChartVersion: {{ $addons.chartVersion }}
+          addonChartRepository: {{ $addons.chartRepository }}
+          addonChartNamespace: {{ $addons.namespace }}
+      selector:
+        matchExpressions:
+          - key: enable_{{ $addons.chartName }}
+            operator: In
+            values: ['true']
   template:
     metadata:
       name: 'addon-{{`{{name}}`}}-{{`{{values.addonChart}}`}}'
