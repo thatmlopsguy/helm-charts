@@ -30,3 +30,11 @@ addons:
     chartRepository: https://kyverno.github.io/kyverno
     chartName: kyverno
     chartVersion: 3.3.7
+
+  feast:
+    enabled: true
+    releaseName: feast
+    namespace: feast
+    chartRepository: https://feast-helm-charts.storage.googleapis.com
+    chartName: feast
+    chartVersion: 0.50.0
