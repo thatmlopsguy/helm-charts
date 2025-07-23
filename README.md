@@ -20,6 +20,16 @@ helm repo update
 
 You can then run `helm search repo thatmlopsguy` to see the current list of available charts.
 
+## Available Charts
+
+| Chart Name                                        | Version | App Version | Description                                                    |
+|---------------------------------------------------|---------|-------------|----------------------------------------------------------------|
+| [cert-manager-extras](charts/cert-manager-extras) | 0.1.0   | v0.1.0      | A Helm chart to install a Cert Manager CA                      |
+| [crossplane-github](charts/crossplane-github)     | 0.1.4   | v0.18.0     | A Helm chart to install crossplane-github provider             |
+| [gitops-bridge](charts/gitops-bridge)             | -       | -           | GitOps bridge templates for ArgoCD integration                 |
+| [metallb-extras](charts/metallb-extras)           | 0.1.0   | 1.16.0      | A Helm chart for Kubernetes MetalLB extras                     |
+| [tenant-namespace](charts/tenant-namespace)       | 0.1.5   | -           | A Helm Chart to bootstrap a Namespace in a Multi-Tenancy setup |
+
 ## License
 
 [Apache License](LICENSE)
