@@ -24,7 +24,7 @@ addons:
     chartVersion: 8.1.3
 
   kyverno2:
-    enabled: true
+    enabled: false
     releaseName: kyverno
     namespace: kyverno
     chartRepository: https://kyverno.github.io/kyverno
@@ -32,9 +32,17 @@ addons:
     chartVersion: 3.3.7
 
   feast:
-    enabled: true
+    enabled: false
     releaseName: feast
     namespace: feast
     chartRepository: https://feast-helm-charts.storage.googleapis.com
     chartName: feast
     chartVersion: 0.50.0
+
+  eraser:
+    enabled: true
+    releaseName: eraser
+    namespace: eraser-system
+    chartRepository: https://eraser-io.github.io/eraser-helm-charts
+    chartName: eraser
+    chartVersion: 1.3.1
