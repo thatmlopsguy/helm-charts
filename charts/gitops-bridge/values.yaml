@@ -32,7 +32,7 @@ addons:
     chartVersion: 3.3.7
 
   feast:
-    enabled: false
+    enabled: true
     releaseName: feast
     namespace: feast
     chartRepository: https://feast-helm-charts.storage.googleapis.com
