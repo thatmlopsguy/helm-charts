@@ -1,0 +1,77 @@
+{{/*
+Support for multiple services - iterate over deployments map and create services for those that need them
+*/}}
+{{- range $deploymentName, $deployment := .Values.deployments }}
+{{- if and (kindOf $deployment | eq "map") ($deployment.enabled) ($deployment.service) ($deployment.service.enabled) }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "global.fullname" $ }}-{{ $deploymentName }}
+  namespace: {{ $deployment.namespace | default $.Values.namespace | default $.Release.Namespace }}
+  labels:
+    {{- include "global.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $deploymentName }}
+  {{- with $deployment.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ $deployment.service.type | default "ClusterIP" }}
+  {{- if $deployment.service.clusterIP }}
+  clusterIP: {{ $deployment.service.clusterIP }}
+  {{- end }}
+  {{- if $deployment.service.loadBalancerIP }}
+  loadBalancerIP: {{ $deployment.service.loadBalancerIP }}
+  {{- end }}
+  {{- if $deployment.service.loadBalancerSourceRanges }}
+  loadBalancerSourceRanges:
+    {{- toYaml $deployment.service.loadBalancerSourceRanges | nindent 4 }}
+  {{- end }}
+  {{- if $deployment.service.externalIPs }}
+  externalIPs:
+    {{- toYaml $deployment.service.externalIPs | nindent 4 }}
+  {{- end }}
+  {{- if $deployment.service.externalName }}
+  externalName: {{ $deployment.service.externalName }}
+  {{- end }}
+  {{- if and ($deployment.service.type | eq "NodePort") ($deployment.service.nodePort) }}
+  {{- if or (and (ge ($deployment.service.nodePort | int) 30000) (le ($deployment.service.nodePort | int) 32767)) (eq ($deployment.service.nodePort | toString) "auto") }}
+  {{- /* Valid NodePort range or auto */ -}}
+  {{- end }}
+  {{- end }}
+  {{- if and ($deployment.service.type | eq "LoadBalancer") ($deployment.service.allocateLoadBalancerNodePorts) }}
+  allocateLoadBalancerNodePorts: {{ $deployment.service.allocateLoadBalancerNodePorts }}
+  {{- end }}
+  {{- if $deployment.service.sessionAffinity }}
+  sessionAffinity: {{ $deployment.service.sessionAffinity }}
+  {{- if eq $deployment.service.sessionAffinity "ClientIP" }}
+  {{- with $deployment.service.sessionAffinityConfig }}
+  sessionAffinityConfig:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end }}
+  {{- end }}
+  {{- if $deployment.service.publishNotReadyAddresses }}
+  publishNotReadyAddresses: {{ $deployment.service.publishNotReadyAddresses }}
+  {{- end }}
+  {{- if $deployment.service.ports }}
+  ports:
+    {{- range $deployment.service.ports }}
+    - name: {{ .name }}
+      port: {{ .port }}
+      protocol: {{ .protocol | default "TCP" }}
+      targetPort: {{ .targetPort | default .name }}
+      {{- if and (eq ($deployment.service.type | default "ClusterIP") "NodePort") (.nodePort) }}
+      nodePort: {{ .nodePort }}
+      {{- end }}
+      {{- if .appProtocol }}
+      appProtocol: {{ .appProtocol }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+  selector:
+    {{- include "global.selectorLabels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $deploymentName }}
+{{- end }}
+{{- end }}
