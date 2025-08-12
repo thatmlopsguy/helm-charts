@@ -1,0 +1,155 @@
+{{/*
+Support for multiple deployments - iterate over deployments map
+*/}}
+{{- range $deploymentName, $deployment := .Values.deployments }}
+{{- if and (kindOf $deployment | eq "map") ($deployment.enabled) }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "global.fullname" $ }}-{{ $deploymentName }}
+  namespace: {{ $deployment.namespace | default $.Values.namespace | default $.Release.Namespace }}
+  labels:
+    {{- include "global.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $deploymentName }}
+  {{- with $deployment.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if not ($deployment.autoscaling | default dict).enabled }}
+  replicas: {{ $deployment.replicaCount | default 1 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "global.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: {{ $deploymentName }}
+  {{- with $deployment.strategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  template:
+    metadata:
+      {{- with $deployment.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "global.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: {{ $deploymentName }}
+        {{- with $deployment.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with ($deployment.imagePullSecrets | default $.Values.imagePullSecrets) }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ ($deployment.serviceAccount | default dict).name | default (include "global.serviceAccountName" $) }}
+      {{- with ($deployment.securityContext | default $.Values.securityContext) }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $deployment.initContainers }}
+      initContainers:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ $deploymentName }}
+          image: {{ $deployment.image.registry }}{{ if $deployment.image.registry }}/{{ end }}{{ $deployment.image.repository }}:{{ $deployment.image.tag | default $.Chart.AppVersion }}
+          imagePullPolicy: {{ $deployment.image.pullPolicy | default "IfNotPresent" }}
+          {{- with ($deployment.containerSecurityContext | default $.Values.containerSecurityContext) }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $deployment.command }}
+          command:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $deployment.args }}
+          args:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if $deployment.ports }}
+          ports:
+            {{- range $deployment.ports }}
+            - name: {{ .name }}
+              containerPort: {{ .containerPort }}
+              protocol: {{ .protocol | default "TCP" }}
+            {{- end }}
+          {{- end }}
+          {{- if or $deployment.env $deployment.envFrom }}
+          {{- with $deployment.env }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $deployment.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          {{- with $deployment.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $deployment.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $deployment.startupProbe }}
+          startupProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with ($deployment.resources | default $.Values.resources) }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $deployment.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        {{- with $deployment.additionalContainers }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with $deployment.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ($deployment.nodeSelector | default $.Values.nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ($deployment.affinity | default $.Values.affinity) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ($deployment.tolerations | default $.Values.tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $deployment.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $deployment.hostAliases }}
+      hostAliases:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if $deployment.dnsPolicy }}
+      dnsPolicy: {{ $deployment.dnsPolicy }}
+      {{- end }}
+      {{- with $deployment.dnsConfig }}
+      dnsConfig:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if $deployment.priorityClassName }}
+      priorityClassName: {{ $deployment.priorityClassName }}
+      {{- end }}
+      {{- if $deployment.restartPolicy }}
+      restartPolicy: {{ $deployment.restartPolicy }}
+      {{- end }}
+      {{- if $deployment.terminationGracePeriodSeconds }}
+      terminationGracePeriodSeconds: {{ $deployment.terminationGracePeriodSeconds }}
+      {{- end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,124 @@
+# Default values for global chart.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Override chart and release names
+nameOverride: ""
+fullnameOverride: ""
+
+# Additional labels to apply to all resources
+labels: {}
+
+# Namespace to deploy to (defaults to release namespace)
+namespace: ""
+
+# Multiple deployments configuration
+# This allows deploying multiple applications from a single chart
+# Each deployment MUST have its own image configuration
+deployments: #{}
+  # Example configuration:
+  frontend:
+    enabled: true
+    replicaCount: 2
+    image:
+      registry: ""           # Optional: container registry
+      repository: nginx      # Required: image repository
+      tag: "1.21.6"         # Required: image tag
+      pullPolicy: IfNotPresent
+    ports:
+      - name: http
+        containerPort: 80
+        protocol: TCP
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+    livenessProbe:
+      httpGet:
+        path: /
+        port: http
+    readinessProbe:
+      httpGet:
+        path: /
+        port: http
+
+  backend:
+    enabled: true
+    replicaCount: 3
+    image:
+      repository: my-app/backend  # Required: each deployment needs its own image
+      tag: "v1.0.0"             # Required: specific version for this deployment
+    ports:
+      - name: api
+        containerPort: 8080
+    env:
+      - name: DATABASE_URL
+        value: "postgresql://..."
+
+# Image pull secrets (applied to all deployments by default)
+imagePullSecrets: []
+
+# Service Account (used as default for all deployments)
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Global pod configuration (used as defaults for all deployments)
+podAnnotations: {}
+podLabels: {}
+
+# Global security contexts (used as defaults for all deployments)
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 2000
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+  capabilities:
+    drop:
+    - ALL
+
+# Global resource defaults (can be overridden per deployment)
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+# Global node selection (can be overridden per deployment)
+nodeSelector: {}
+
+# Global tolerations (can be overridden per deployment)
+tolerations: []
+
+# Global affinity rules (can be overridden per deployment)
+affinity: {}
+
+# Global topology spread constraints
+topologySpreadConstraints: []
+
+# Global host aliases
+hostAliases: []
+
+# Global DNS configuration
+dnsPolicy: ""
+dnsConfig: {}
+
+# Global priority class
+priorityClassName: ""
+
+# Global restart policy
+restartPolicy: ""
+
+# Global grace period for pod termination
+terminationGracePeriodSeconds: 30
