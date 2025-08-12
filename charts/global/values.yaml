@@ -117,9 +117,63 @@ deployments: #{}
           hosts:
             - api.example.com
             - backend.example.com
+    # Example HPA configuration:
+    # autoscaling:
+    #   enabled: true
+    #   minReplicas: 2
+    #   maxReplicas: 10
+    #   targetCPUUtilizationPercentage: 70
+    #   targetMemoryUtilizationPercentage: 80
+    #   behavior:
+    #     scaleDown:
+    #       stabilizationWindowSeconds: 60
+    #       policies:
+    #       - type: Percent
+    #         value: 10
+    #         periodSeconds: 60
+    #     scaleUp:
+    #       stabilizationWindowSeconds: 30
+    #       policies:
+    #       - type: Percent
+    #         value: 50
+    #         periodSeconds: 30
     env:
       - name: DATABASE_URL
         value: "postgresql://..."
+
+  # Example ConfigMap configuration:
+  # app-config:
+  #   enabled: true
+  #   image:
+  #     repository: myapp/config
+  #     tag: "v1.0.0"
+  #   configMap:
+  #     enabled: true
+  #     annotations:
+  #       config.kubernetes.io/source: "application-config"
+  #     data:
+  #       app.properties: |
+  #         server.port=8080
+  #         logging.level.root=INFO
+  #         database.timeout=30
+  #       nginx.conf: |
+  #         server {
+  #           listen 80;
+  #           location / {
+  #             proxy_pass http://backend:8080;
+  #           }
+  #         }
+  #       config.json: |
+  #         {
+  #           "features": {
+  #             "auth": true,
+  #             "analytics": false
+  #           },
+  #           "api": {
+  #             "timeout": 5000,
+  #             "retries": 3
+  #           }
+  #         }
 
   # Example job configuration:
   # migration:
@@ -229,3 +283,28 @@ restartPolicy: ""
 
 # Global grace period for pod termination
 terminationGracePeriodSeconds: 30
+
+# Global ConfigMaps (shared across all deployments)
+configMaps:
+  enabled: false
+  maps: {}
+    # Example global ConfigMaps:
+    # shared-config:
+    #   annotations:
+    #     config.kubernetes.io/source: "shared-configuration"
+    #   data:
+    #     database.properties: |
+    #       host=postgres.example.com
+    #       port=5432
+    #       database=myapp
+    #       ssl=true
+    #     redis.conf: |
+    #       maxmemory 256mb
+    #       maxmemory-policy allkeys-lru
+    #       save 900 1
+    # logging-config:
+    #   data:
+    #     log4j.properties: |
+    #       log4j.rootLogger=INFO, stdout
+    #       log4j.appender.stdout=org.apache.log4j.ConsoleAppender
+    #       log4j.appender.stdout.layout=org.apache.log4j.PatternLayout

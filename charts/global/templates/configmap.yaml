@@ -1,0 +1,64 @@
+{{- range $name, $deployment := .Values.deployments }}
+{{- if and $deployment.configMap $deployment.configMap.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "global.fullname" $ }}-{{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "global.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $name }}
+  {{- with $deployment.configMap.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- if or $deployment.configMap.data $deployment.configMap.binaryData }}
+data:
+  {{- with $deployment.configMap.data }}
+  {{- range $key, $value := . }}
+  {{ $key }}: |
+    {{- $value | nindent 4 }}
+  {{- end }}
+  {{- end }}
+{{- if $deployment.configMap.binaryData }}
+binaryData:
+  {{- toYaml $deployment.configMap.binaryData | nindent 2 }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
+Support for global ConfigMaps that are shared across deployments
+*/}}
+{{- if and .Values.configMaps .Values.configMaps.enabled }}
+{{- range $name, $configMap := .Values.configMaps.maps }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "global.fullname" $ }}-{{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "global.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: shared
+  {{- with $configMap.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- if or $configMap.data $configMap.binaryData }}
+data:
+  {{- with $configMap.data }}
+  {{- range $key, $value := . }}
+  {{ $key }}: |
+    {{- $value | nindent 4 }}
+  {{- end }}
+  {{- end }}
+{{- if $configMap.binaryData }}
+binaryData:
+  {{- toYaml $configMap.binaryData | nindent 2 }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

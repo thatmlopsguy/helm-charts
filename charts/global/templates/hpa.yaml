@@ -1,0 +1,50 @@
+{{- range $name, $deployment := .Values.deployments }}
+{{- if and $deployment.autoscaling $deployment.autoscaling.enabled (not (and $deployment.job $deployment.job.enabled)) }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "global.fullname" $ }}-{{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "global.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $name }}
+  {{- with $deployment.autoscaling.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "global.fullname" $ }}-{{ $name }}
+  minReplicas: {{ $deployment.autoscaling.minReplicas | default 1 }}
+  maxReplicas: {{ $deployment.autoscaling.maxReplicas | default 10 }}
+  {{- if or $deployment.autoscaling.targetCPUUtilizationPercentage $deployment.autoscaling.targetMemoryUtilizationPercentage $deployment.autoscaling.metrics }}
+  metrics:
+    {{- if $deployment.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ $deployment.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if $deployment.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ $deployment.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+    {{- if $deployment.autoscaling.metrics }}
+    {{- toYaml $deployment.autoscaling.metrics | nindent 4 }}
+    {{- end }}
+  {{- end }}
+  {{- if $deployment.autoscaling.behavior }}
+  behavior:
+    {{- toYaml $deployment.autoscaling.behavior | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}
