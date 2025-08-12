@@ -1,0 +1,58 @@
+{{/*
+Support for multiple persistent volume claims - iterate over persistentVolumeClaims.claims map
+*/}}
+{{- range $pvcName, $pvc := .Values.persistentVolumeClaims.claims }}
+{{- if and (kindOf $pvc | eq "map") ($pvc.enabled) }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "global.fullname" $ }}-{{ $pvcName }}
+  namespace: {{ $pvc.namespace | default $.Values.namespace | default $.Release.Namespace }}
+  labels:
+    {{- include "global.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $pvcName }}
+    {{- with $pvc.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with $pvc.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    {{- range $pvc.accessModes }}
+    - {{ . }}
+    {{- end }}
+  {{- if $pvc.volumeMode }}
+  volumeMode: {{ $pvc.volumeMode }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ $pvc.resources.requests.storage }}
+    {{- if $pvc.resources.limits }}
+    limits:
+      {{- if $pvc.resources.limits.storage }}
+      storage: {{ $pvc.resources.limits.storage }}
+      {{- end }}
+    {{- end }}
+  {{- if $pvc.storageClassName }}
+  storageClassName: {{ $pvc.storageClassName }}
+  {{- end }}
+  {{- if $pvc.selector }}
+  selector:
+    {{- toYaml $pvc.selector | nindent 4 }}
+  {{- end }}
+  {{- if $pvc.volumeName }}
+  volumeName: {{ $pvc.volumeName }}
+  {{- end }}
+  {{- if $pvc.dataSource }}
+  dataSource:
+    {{- toYaml $pvc.dataSource | nindent 4 }}
+  {{- end }}
+  {{- if $pvc.dataSourceRef }}
+  dataSourceRef:
+    {{- toYaml $pvc.dataSourceRef | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}

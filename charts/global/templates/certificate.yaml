@@ -1,0 +1,170 @@
+{{/*
+Support for multiple certificates - iterate over global certificates map and create certificates
+*/}}
+{{- if .Values.certificates.enabled }}
+{{- range $certName, $cert := .Values.certificates.certs }}
+{{- if and (kindOf $cert | eq "map") ($cert.enabled) }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "global.fullname" $ }}-{{ $certName }}
+  namespace: {{ $cert.namespace | default $.Values.namespace | default $.Release.Namespace }}
+  labels:
+    {{- include "global.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: certificate
+    app.kubernetes.io/cert-name: {{ $certName }}
+  {{- with $cert.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  # Secret name where the certificate will be stored
+  secretName: {{ $cert.secretName | default (printf "%s-%s" (include "global.fullname" $) $certName) }}
+
+  # Certificate issuer reference
+  issuerRef:
+    name: {{ $cert.issuerRef.name | required "Certificate issuerRef.name is required" }}
+    kind: {{ $cert.issuerRef.kind | default "ClusterIssuer" }}
+    {{- if $cert.issuerRef.group }}
+    group: {{ $cert.issuerRef.group }}
+    {{- end }}
+
+  # Common name for the certificate
+  {{- if $cert.commonName }}
+  commonName: {{ $cert.commonName }}
+  {{- end }}
+
+  # DNS names for the certificate
+  {{- if $cert.dnsNames }}
+  dnsNames:
+    {{- toYaml $cert.dnsNames | nindent 4 }}
+  {{- end }}
+
+  # IP addresses for the certificate
+  {{- if $cert.ipAddresses }}
+  ipAddresses:
+    {{- toYaml $cert.ipAddresses | nindent 4 }}
+  {{- end }}
+
+  # URI SANs for the certificate
+  {{- if $cert.uris }}
+  uris:
+    {{- toYaml $cert.uris | nindent 4 }}
+  {{- end }}
+
+  # Email addresses for the certificate
+  {{- if $cert.emailAddresses }}
+  emailAddresses:
+    {{- toYaml $cert.emailAddresses | nindent 4 }}
+  {{- end }}
+
+  # Certificate duration
+  {{- if $cert.duration }}
+  duration: {{ $cert.duration }}
+  {{- end }}
+
+  # Certificate renewal before expiry
+  {{- if $cert.renewBefore }}
+  renewBefore: {{ $cert.renewBefore }}
+  {{- end }}
+
+  # Certificate subject configuration
+  {{- if $cert.subject }}
+  subject:
+    {{- if $cert.subject.organizations }}
+    organizations:
+      {{- toYaml $cert.subject.organizations | nindent 6 }}
+    {{- end }}
+    {{- if $cert.subject.countries }}
+    countries:
+      {{- toYaml $cert.subject.countries | nindent 6 }}
+    {{- end }}
+    {{- if $cert.subject.organizationalUnits }}
+    organizationalUnits:
+      {{- toYaml $cert.subject.organizationalUnits | nindent 6 }}
+    {{- end }}
+    {{- if $cert.subject.localities }}
+    localities:
+      {{- toYaml $cert.subject.localities | nindent 6 }}
+    {{- end }}
+    {{- if $cert.subject.provinces }}
+    provinces:
+      {{- toYaml $cert.subject.provinces | nindent 6 }}
+    {{- end }}
+    {{- if $cert.subject.streetAddresses }}
+    streetAddresses:
+      {{- toYaml $cert.subject.streetAddresses | nindent 6 }}
+    {{- end }}
+    {{- if $cert.subject.postalCodes }}
+    postalCodes:
+      {{- toYaml $cert.subject.postalCodes | nindent 6 }}
+    {{- end }}
+    {{- if $cert.subject.serialNumber }}
+    serialNumber: {{ $cert.subject.serialNumber }}
+    {{- end }}
+  {{- end }}
+
+  # Certificate private key configuration
+  {{- if $cert.privateKey }}
+  privateKey:
+    {{- if $cert.privateKey.algorithm }}
+    algorithm: {{ $cert.privateKey.algorithm }}
+    {{- end }}
+    {{- if $cert.privateKey.encoding }}
+    encoding: {{ $cert.privateKey.encoding }}
+    {{- end }}
+    {{- if $cert.privateKey.size }}
+    size: {{ $cert.privateKey.size }}
+    {{- end }}
+    {{- if $cert.privateKey.rotationPolicy }}
+    rotationPolicy: {{ $cert.privateKey.rotationPolicy }}
+    {{- end }}
+  {{- end }}
+
+  # Certificate key usages
+  {{- if $cert.usages }}
+  usages:
+    {{- toYaml $cert.usages | nindent 4 }}
+  {{- end }}
+
+  # Certificate revocation checking
+  {{- if $cert.revisionHistoryLimit }}
+  revisionHistoryLimit: {{ $cert.revisionHistoryLimit }}
+  {{- end }}
+
+  # Additional certificate options
+  {{- if $cert.isCA }}
+  isCA: {{ $cert.isCA }}
+  {{- end }}
+
+  {{- if $cert.keystores }}
+  keystores:
+    {{- if $cert.keystores.jks }}
+    jks:
+      create: {{ $cert.keystores.jks.create | default false }}
+      {{- if $cert.keystores.jks.passwordSecretRef }}
+      passwordSecretRef:
+        name: {{ $cert.keystores.jks.passwordSecretRef.name }}
+        key: {{ $cert.keystores.jks.passwordSecretRef.key }}
+      {{- end }}
+    {{- end }}
+    {{- if $cert.keystores.pkcs12 }}
+    pkcs12:
+      create: {{ $cert.keystores.pkcs12.create | default false }}
+      {{- if $cert.keystores.pkcs12.passwordSecretRef }}
+      passwordSecretRef:
+        name: {{ $cert.keystores.pkcs12.passwordSecretRef.name }}
+        key: {{ $cert.keystores.pkcs12.passwordSecretRef.key }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+
+  {{- if $cert.additionalOutputFormats }}
+  additionalOutputFormats:
+    {{- toYaml $cert.additionalOutputFormats | nindent 4 }}
+  {{- end }}
+
+{{- end }}
+{{- end }}
+{{- end }}

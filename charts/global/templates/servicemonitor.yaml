@@ -1,0 +1,176 @@
+{{/*
+Support for ServiceMonitor per deployment - iterate over deployments map
+Creates Prometheus ServiceMonitor resources for monitoring services
+*/}}
+{{- range $deploymentName, $deployment := .Values.deployments }}
+{{- if and (kindOf $deployment | eq "map") ($deployment.enabled) ($deployment.serviceMonitor) ($deployment.serviceMonitor.enabled) }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "global.fullname" $ }}-{{ $deploymentName }}-servicemonitor
+  namespace: {{ $deployment.serviceMonitor.namespace | default $deployment.namespace | default $.Values.namespace | default $.Release.Namespace }}
+  labels:
+    {{- include "global.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $deploymentName }}
+    {{- with $deployment.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with $deployment.serviceMonitor.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if $deployment.serviceMonitor.jobLabel }}
+  jobLabel: {{ $deployment.serviceMonitor.jobLabel }}
+  {{- end }}
+  {{- if $deployment.serviceMonitor.targetLabels }}
+  targetLabels:
+    {{- range $deployment.serviceMonitor.targetLabels }}
+    - {{ . }}
+    {{- end }}
+  {{- end }}
+  {{- if $deployment.serviceMonitor.podTargetLabels }}
+  podTargetLabels:
+    {{- range $deployment.serviceMonitor.podTargetLabels }}
+    - {{ . }}
+    {{- end }}
+  {{- end }}
+  {{- if $deployment.serviceMonitor.sampleLimit }}
+  sampleLimit: {{ $deployment.serviceMonitor.sampleLimit }}
+  {{- end }}
+  {{- if $deployment.serviceMonitor.targetLimit }}
+  targetLimit: {{ $deployment.serviceMonitor.targetLimit }}
+  {{- end }}
+  {{- if $deployment.serviceMonitor.labelLimit }}
+  labelLimit: {{ $deployment.serviceMonitor.labelLimit }}
+  {{- end }}
+  {{- if $deployment.serviceMonitor.labelNameLengthLimit }}
+  labelNameLengthLimit: {{ $deployment.serviceMonitor.labelNameLengthLimit }}
+  {{- end }}
+  {{- if $deployment.serviceMonitor.labelValueLengthLimit }}
+  labelValueLengthLimit: {{ $deployment.serviceMonitor.labelValueLengthLimit }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "global.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: {{ $deploymentName }}
+      {{- if $deployment.serviceMonitor.selector }}
+      {{- with $deployment.serviceMonitor.selector.matchLabels }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+      {{- end }}
+    {{- if $deployment.serviceMonitor.selector }}
+    {{- if $deployment.serviceMonitor.selector.matchExpressions }}
+    matchExpressions:
+      {{- toYaml $deployment.serviceMonitor.selector.matchExpressions | nindent 6 }}
+    {{- end }}
+    {{- end }}
+  {{- if $deployment.serviceMonitor.namespaceSelector }}
+  namespaceSelector:
+    {{- toYaml $deployment.serviceMonitor.namespaceSelector | nindent 4 }}
+  {{- end }}
+  endpoints:
+    {{- range $deployment.serviceMonitor.endpoints }}
+    - port: {{ .port }}
+      {{- if .targetPort }}
+      targetPort: {{ .targetPort }}
+      {{- end }}
+      {{- if .scheme }}
+      scheme: {{ .scheme }}
+      {{- end }}
+      {{- if .path }}
+      path: {{ .path }}
+      {{- end }}
+      {{- if .params }}
+      params:
+        {{- range $key, $values := .params }}
+        {{ $key }}:
+          {{- range $values }}
+          - {{ . | quote }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- if .interval }}
+      interval: {{ .interval }}
+      {{- end }}
+      {{- if .scrapeTimeout }}
+      scrapeTimeout: {{ .scrapeTimeout }}
+      {{- end }}
+      {{- if .honorLabels }}
+      honorLabels: {{ .honorLabels }}
+      {{- end }}
+      {{- if .honorTimestamps }}
+      honorTimestamps: {{ .honorTimestamps }}
+      {{- end }}
+      {{- if .basicAuth }}
+      basicAuth:
+        {{- if .basicAuth.username }}
+        username:
+          {{- toYaml .basicAuth.username | nindent 10 }}
+        {{- end }}
+        {{- if .basicAuth.password }}
+        password:
+          {{- toYaml .basicAuth.password | nindent 10 }}
+        {{- end }}
+        {{- if .basicAuth.passwordFile }}
+        passwordFile: {{ .basicAuth.passwordFile }}
+        {{- end }}
+      {{- end }}
+      {{- if .bearerTokenFile }}
+      bearerTokenFile: {{ .bearerTokenFile }}
+      {{- end }}
+      {{- if .bearerTokenSecret }}
+      bearerTokenSecret:
+        {{- toYaml .bearerTokenSecret | nindent 8 }}
+      {{- end }}
+      {{- if .tlsConfig }}
+      tlsConfig:
+        {{- if .tlsConfig.caFile }}
+        caFile: {{ .tlsConfig.caFile }}
+        {{- end }}
+        {{- if .tlsConfig.ca }}
+        ca:
+          {{- toYaml .tlsConfig.ca | nindent 10 }}
+        {{- end }}
+        {{- if .tlsConfig.certFile }}
+        certFile: {{ .tlsConfig.certFile }}
+        {{- end }}
+        {{- if .tlsConfig.cert }}
+        cert:
+          {{- toYaml .tlsConfig.cert | nindent 10 }}
+        {{- end }}
+        {{- if .tlsConfig.keyFile }}
+        keyFile: {{ .tlsConfig.keyFile }}
+        {{- end }}
+        {{- if .tlsConfig.keySecret }}
+        keySecret:
+          {{- toYaml .tlsConfig.keySecret | nindent 10 }}
+        {{- end }}
+        {{- if .tlsConfig.serverName }}
+        serverName: {{ .tlsConfig.serverName }}
+        {{- end }}
+        {{- if .tlsConfig.insecureSkipVerify }}
+        insecureSkipVerify: {{ .tlsConfig.insecureSkipVerify }}
+        {{- end }}
+      {{- end }}
+      {{- if .proxyUrl }}
+      proxyUrl: {{ .proxyUrl }}
+      {{- end }}
+      {{- if .followRedirects }}
+      followRedirects: {{ .followRedirects }}
+      {{- end }}
+      {{- if .enableHttp2 }}
+      enableHttp2: {{ .enableHttp2 }}
+      {{- end }}
+      {{- if .metricRelabelings }}
+      metricRelabelings:
+        {{- toYaml .metricRelabelings | nindent 8 }}
+      {{- end }}
+      {{- if .relabelings }}
+      relabelings:
+        {{- toYaml .relabelings | nindent 8 }}
+      {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}

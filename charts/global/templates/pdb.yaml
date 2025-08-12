@@ -1,0 +1,27 @@
+{{/*
+Support for PodDisruptionBudget per deployment - iterate over deployments map
+*/}}
+{{- range $deploymentName, $deployment := .Values.deployments }}
+{{- if and (kindOf $deployment | eq "map") ($deployment.enabled) ($deployment.podDisruptionBudget) ($deployment.podDisruptionBudget.enabled) }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "global.fullname" $ }}-{{ $deploymentName }}-pdb
+  namespace: {{ $deployment.namespace | default $.Values.namespace | default $.Release.Namespace }}
+  labels:
+    {{- include "global.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $deploymentName }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "global.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: {{ $deploymentName }}
+  {{- if $deployment.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ $deployment.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  {{- if $deployment.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ $deployment.podDisruptionBudget.maxUnavailable }}
+  {{- end }}
+{{- end }}
+{{- end }}

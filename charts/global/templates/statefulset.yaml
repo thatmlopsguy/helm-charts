@@ -1,0 +1,161 @@
+{{/*
+Support for multiple statefulsets - iterate over statefulsets map
+*/}}
+{{- range $statefulsetName, $statefulset := .Values.statefulsets }}
+{{- if and (kindOf $statefulset | eq "map") ($statefulset.enabled) }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "global.fullname" $ }}-{{ $statefulsetName }}
+  namespace: {{ $statefulset.namespace | default $.Values.namespace | default $.Release.Namespace }}
+  labels:
+    {{- include "global.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $statefulsetName }}
+  {{- with $statefulset.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  serviceName: {{ $statefulset.serviceName | default (printf "%s-%s-headless" (include "global.fullname" $) $statefulsetName) }}
+  replicas: {{ $statefulset.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "global.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: {{ $statefulsetName }}
+  {{- with $statefulset.updateStrategy }}
+  updateStrategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- if $statefulset.podManagementPolicy }}
+  podManagementPolicy: {{ $statefulset.podManagementPolicy }}
+  {{- end }}
+  {{- if $statefulset.revisionHistoryLimit }}
+  revisionHistoryLimit: {{ $statefulset.revisionHistoryLimit }}
+  {{- end }}
+  template:
+    metadata:
+      {{- with $statefulset.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "global.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: {{ $statefulsetName }}
+        {{- with $statefulset.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with ($statefulset.imagePullSecrets | default $.Values.imagePullSecrets) }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ ($statefulset.serviceAccount | default dict).name | default (include "global.serviceAccountName" $) }}
+      {{- with ($statefulset.securityContext | default $.Values.securityContext) }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $statefulset.initContainers }}
+      initContainers:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ $statefulsetName }}
+          image: {{ $statefulset.image.registry }}{{ if $statefulset.image.registry }}/{{ end }}{{ $statefulset.image.repository }}:{{ $statefulset.image.tag | default $.Chart.AppVersion }}
+          imagePullPolicy: {{ $statefulset.image.pullPolicy | default "IfNotPresent" }}
+          {{- with ($statefulset.containerSecurityContext | default $.Values.containerSecurityContext) }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $statefulset.command }}
+          command:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $statefulset.args }}
+          args:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if $statefulset.ports }}
+          ports:
+            {{- range $statefulset.ports }}
+            - name: {{ .name }}
+              containerPort: {{ .containerPort }}
+              protocol: {{ .protocol | default "TCP" }}
+            {{- end }}
+          {{- end }}
+          {{- if or $statefulset.env $statefulset.envFrom }}
+          {{- with $statefulset.env }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $statefulset.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          {{- with $statefulset.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $statefulset.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $statefulset.startupProbe }}
+          startupProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with ($statefulset.resources | default $.Values.resources) }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $statefulset.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        {{- with $statefulset.additionalContainers }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with $statefulset.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ($statefulset.nodeSelector | default $.Values.nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ($statefulset.affinity | default $.Values.affinity) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ($statefulset.tolerations | default $.Values.tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $statefulset.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $statefulset.hostAliases }}
+      hostAliases:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if $statefulset.dnsPolicy }}
+      dnsPolicy: {{ $statefulset.dnsPolicy }}
+      {{- end }}
+      {{- with $statefulset.dnsConfig }}
+      dnsConfig:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if $statefulset.priorityClassName }}
+      priorityClassName: {{ $statefulset.priorityClassName }}
+      {{- end }}
+      {{- if $statefulset.terminationGracePeriodSeconds }}
+      terminationGracePeriodSeconds: {{ $statefulset.terminationGracePeriodSeconds }}
+      {{- end }}
+  {{- with $statefulset.volumeClaimTemplates }}
+  volumeClaimTemplates:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}

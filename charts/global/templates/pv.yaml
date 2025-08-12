@@ -1,0 +1,116 @@
+{{/*
+Support for multiple persistent volumes - iterate over persistentVolumes.volumes map
+*/}}
+{{- range $pvName, $pv := .Values.persistentVolumes.volumes }}
+{{- if and (kindOf $pv | eq "map") ($pv.enabled) }}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "global.fullname" $ }}-{{ $pvName }}
+  labels:
+    {{- include "global.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $pvName }}
+    {{- with $pv.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with $pv.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  capacity:
+    storage: {{ $pv.capacity.storage }}
+  accessModes:
+    {{- range $pv.accessModes }}
+    - {{ . }}
+    {{- end }}
+  {{- if $pv.persistentVolumeReclaimPolicy }}
+  persistentVolumeReclaimPolicy: {{ $pv.persistentVolumeReclaimPolicy }}
+  {{- end }}
+  {{- if $pv.storageClassName }}
+  storageClassName: {{ $pv.storageClassName }}
+  {{- end }}
+  {{- if $pv.volumeMode }}
+  volumeMode: {{ $pv.volumeMode }}
+  {{- end }}
+  {{- if $pv.mountOptions }}
+  mountOptions:
+    {{- range $pv.mountOptions }}
+    - {{ . }}
+    {{- end }}
+  {{- end }}
+  {{- if $pv.nodeAffinity }}
+  nodeAffinity:
+    {{- toYaml $pv.nodeAffinity | nindent 4 }}
+  {{- end }}
+  {{- if $pv.hostPath }}
+  hostPath:
+    {{- toYaml $pv.hostPath | nindent 4 }}
+  {{- else if $pv.nfs }}
+  nfs:
+    {{- toYaml $pv.nfs | nindent 4 }}
+  {{- else if $pv.awsElasticBlockStore }}
+  awsElasticBlockStore:
+    {{- toYaml $pv.awsElasticBlockStore | nindent 4 }}
+  {{- else if $pv.azureDisk }}
+  azureDisk:
+    {{- toYaml $pv.azureDisk | nindent 4 }}
+  {{- else if $pv.azureFile }}
+  azureFile:
+    {{- toYaml $pv.azureFile | nindent 4 }}
+  {{- else if $pv.gcePersistentDisk }}
+  gcePersistentDisk:
+    {{- toYaml $pv.gcePersistentDisk | nindent 4 }}
+  {{- else if $pv.cephfs }}
+  cephfs:
+    {{- toYaml $pv.cephfs | nindent 4 }}
+  {{- else if $pv.cinder }}
+  cinder:
+    {{- toYaml $pv.cinder | nindent 4 }}
+  {{- else if $pv.fc }}
+  fc:
+    {{- toYaml $pv.fc | nindent 4 }}
+  {{- else if $pv.flexVolume }}
+  flexVolume:
+    {{- toYaml $pv.flexVolume | nindent 4 }}
+  {{- else if $pv.flocker }}
+  flocker:
+    {{- toYaml $pv.flocker | nindent 4 }}
+  {{- else if $pv.glusterfs }}
+  glusterfs:
+    {{- toYaml $pv.glusterfs | nindent 4 }}
+  {{- else if $pv.iscsi }}
+  iscsi:
+    {{- toYaml $pv.iscsi | nindent 4 }}
+  {{- else if $pv.local }}
+  local:
+    {{- toYaml $pv.local | nindent 4 }}
+  {{- else if $pv.portworxVolume }}
+  portworxVolume:
+    {{- toYaml $pv.portworxVolume | nindent 4 }}
+  {{- else if $pv.quobyte }}
+  quobyte:
+    {{- toYaml $pv.quobyte | nindent 4 }}
+  {{- else if $pv.rbd }}
+  rbd:
+    {{- toYaml $pv.rbd | nindent 4 }}
+  {{- else if $pv.scaleIO }}
+  scaleIO:
+    {{- toYaml $pv.scaleIO | nindent 4 }}
+  {{- else if $pv.storageos }}
+  storageos:
+    {{- toYaml $pv.storageos | nindent 4 }}
+  {{- else if $pv.vsphereVolume }}
+  vsphereVolume:
+    {{- toYaml $pv.vsphereVolume | nindent 4 }}
+  {{- else if $pv.csi }}
+  csi:
+    {{- toYaml $pv.csi | nindent 4 }}
+  {{- end }}
+  {{- if $pv.claimRef }}
+  claimRef:
+    {{- toYaml $pv.claimRef | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}

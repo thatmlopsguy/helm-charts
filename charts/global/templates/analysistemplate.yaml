@@ -1,0 +1,197 @@
+{{/*
+Support for AnalysisTemplate per deployment - iterate over deployments map
+Creates ArgoCD AnalysisTemplate resources for advanced deployment strategies
+*/}}
+{{- range $deploymentName, $deployment := .Values.deployments }}
+{{- if and (kindOf $deployment | eq "map") ($deployment.enabled) ($deployment.analysisTemplate) ($deployment.analysisTemplate.enabled) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: {{ include "global.fullname" $ }}-{{ $deploymentName }}-analysis
+  namespace: {{ $deployment.namespace | default $.Values.namespace | default $.Release.Namespace }}
+  labels:
+    {{- include "global.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $deploymentName }}
+    {{- with $deployment.analysisTemplate.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with $deployment.analysisTemplate.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if $deployment.analysisTemplate.args }}
+  args:
+    {{- range $deployment.analysisTemplate.args }}
+    - name: {{ .name }}
+      {{- if .value }}
+      value: {{ .value | quote }}
+      {{- end }}
+      {{- if .valueFrom }}
+      valueFrom:
+        {{- toYaml .valueFrom | nindent 8 }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+  metrics:
+    {{- range $deployment.analysisTemplate.metrics }}
+    - name: {{ .name }}
+      {{- if .initialDelay }}
+      initialDelay: {{ .initialDelay }}
+      {{- end }}
+      {{- if .interval }}
+      interval: {{ .interval }}
+      {{- end }}
+      {{- if .count }}
+      count: {{ .count }}
+      {{- end }}
+      {{- if .successCondition }}
+      successCondition: {{ .successCondition | quote }}
+      {{- end }}
+      {{- if .failureCondition }}
+      failureCondition: {{ .failureCondition | quote }}
+      {{- end }}
+      {{- if .failureLimit }}
+      failureLimit: {{ .failureLimit }}
+      {{- end }}
+      {{- if .inconclusiveLimit }}
+      inconclusiveLimit: {{ .inconclusiveLimit }}
+      {{- end }}
+      {{- if .consecutiveErrorLimit }}
+      consecutiveErrorLimit: {{ .consecutiveErrorLimit }}
+      {{- end }}
+      {{- if .provider }}
+      provider:
+        {{- if .provider.prometheus }}
+        prometheus:
+          address: {{ .provider.prometheus.address }}
+          {{- if .provider.prometheus.query }}
+          query: {{ .provider.prometheus.query | quote }}
+          {{- end }}
+          {{- if .provider.prometheus.timeout }}
+          timeout: {{ .provider.prometheus.timeout }}
+          {{- end }}
+          {{- if .provider.prometheus.authentication }}
+          authentication:
+            {{- toYaml .provider.prometheus.authentication | nindent 12 }}
+          {{- end }}
+          {{- if .provider.prometheus.insecure }}
+          insecure: {{ .provider.prometheus.insecure }}
+          {{- end }}
+          {{- if .provider.prometheus.headers }}
+          headers:
+            {{- range .provider.prometheus.headers }}
+            - key: {{ .key }}
+              value: {{ .value }}
+            {{- end }}
+          {{- end }}
+        {{- else if .provider.job }}
+        job:
+          {{- toYaml .provider.job | nindent 10 }}
+        {{- else if .provider.web }}
+        web:
+          {{- if .provider.web.url }}
+          url: {{ .provider.web.url }}
+          {{- end }}
+          {{- if .provider.web.headers }}
+          headers:
+            {{- range .provider.web.headers }}
+            - key: {{ .key }}
+              value: {{ .value }}
+            {{- end }}
+          {{- end }}
+          {{- if .provider.web.timeoutSeconds }}
+          timeoutSeconds: {{ .provider.web.timeoutSeconds }}
+          {{- end }}
+          {{- if .provider.web.jsonPath }}
+          jsonPath: {{ .provider.web.jsonPath | quote }}
+          {{- end }}
+          {{- if .provider.web.method }}
+          method: {{ .provider.web.method }}
+          {{- end }}
+          {{- if .provider.web.body }}
+          body: {{ .provider.web.body | quote }}
+          {{- end }}
+          {{- if .provider.web.authentication }}
+          authentication:
+            {{- toYaml .provider.web.authentication | nindent 12 }}
+          {{- end }}
+          {{- if .provider.web.insecure }}
+          insecure: {{ .provider.web.insecure }}
+          {{- end }}
+        {{- else if .provider.datadog }}
+        datadog:
+          {{- if .provider.datadog.apiVersion }}
+          apiVersion: {{ .provider.datadog.apiVersion }}
+          {{- end }}
+          {{- if .provider.datadog.app }}
+          app: {{ .provider.datadog.app }}
+          {{- end }}
+          {{- if .provider.datadog.key }}
+          key: {{ .provider.datadog.key }}
+          {{- end }}
+          {{- if .provider.datadog.query }}
+          query: {{ .provider.datadog.query | quote }}
+          {{- end }}
+          {{- if .provider.datadog.interval }}
+          interval: {{ .provider.datadog.interval }}
+          {{- end }}
+        {{- else if .provider.wavefront }}
+        wavefront:
+          address: {{ .provider.wavefront.address }}
+          query: {{ .provider.wavefront.query | quote }}
+          {{- if .provider.wavefront.headers }}
+          headers:
+            {{- range .provider.wavefront.headers }}
+            - key: {{ .key }}
+              value: {{ .value }}
+            {{- end }}
+          {{- end }}
+        {{- else if .provider.newRelic }}
+        newRelic:
+          {{- if .provider.newRelic.profile }}
+          profile: {{ .provider.newRelic.profile }}
+          {{- end }}
+          query: {{ .provider.newRelic.query | quote }}
+        {{- else if .provider.graphite }}
+        graphite:
+          address: {{ .provider.graphite.address }}
+          query: {{ .provider.graphite.query | quote }}
+        {{- else if .provider.influxdb }}
+        influxdb:
+          {{- if .provider.influxdb.profile }}
+          profile: {{ .provider.influxdb.profile }}
+          {{- end }}
+          query: {{ .provider.influxdb.query | quote }}
+        {{- else if .provider.cloudWatch }}
+        cloudWatch:
+          {{- toYaml .provider.cloudWatch | nindent 10 }}
+        {{- else if .provider.kayenta }}
+        kayenta:
+          {{- toYaml .provider.kayenta | nindent 10 }}
+        {{- else if .provider.skywalking }}
+        skywalking:
+          address: {{ .provider.skywalking.address }}
+          query: {{ .provider.skywalking.query | quote }}
+          {{- if .provider.skywalking.interval }}
+          interval: {{ .provider.skywalking.interval }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+  {{- if $deployment.analysisTemplate.dryRun }}
+  dryRun:
+    {{- range $deployment.analysisTemplate.dryRun }}
+    - metricName: {{ .metricName }}
+    {{- end }}
+  {{- end }}
+  {{- if $deployment.analysisTemplate.measurementRetention }}
+  measurementRetention:
+    {{- range $deployment.analysisTemplate.measurementRetention }}
+    - metricName: {{ .metricName }}
+      limit: {{ .limit }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- end }}

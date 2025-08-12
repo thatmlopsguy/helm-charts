@@ -141,6 +141,305 @@ deployments: # {}
       - name: DATABASE_URL
         value: "postgresql://..."
 
+    # Example ArgoCD Rollout configuration for advanced deployment strategies:
+    # rollout:
+    #   enabled: false                            # Enable Rollout for this deployment
+    #   annotations:
+    #     rollout.argoproj.io/description: "Advanced deployment rollout"
+    #   labels:
+    #     rollout-type: "canary"
+    #   revisionHistoryLimit: 5                   # Number of old ReplicaSets to retain
+    #   progressDeadlineSeconds: 600              # Maximum time in seconds for a rollout to make progress
+    #   strategy:
+    #     type: canary                            # Deployment strategy: "canary" or "blueGreen"
+    #     canary:                                 # Canary deployment configuration
+    #       maxSurge: 1                           # Maximum number of pods that can be created above desired replica count
+    #       maxUnavailable: 0                     # Maximum number of pods that can be unavailable during the update
+    #       steps:                                # List of canary deployment steps
+    #         - setWeight: 10                     # Set 10% of traffic to canary
+    #         - pause:
+    #             duration: 30s                   # Pause for 30 seconds
+    #         - setWeight: 25                     # Set 25% of traffic to canary
+    #         - pause: {}                         # Pause indefinitely (manual promotion)
+    #         - setWeight: 50                     # Set 50% of traffic to canary
+    #         - analysis:                         # Run analysis during this step
+    #             templates:
+    #               - templateName: success-rate  # Reference to AnalysisTemplate
+    #               - templateName: latency-p99
+    #             args:
+    #               - name: service-name
+    #                 value: "backend-api"
+    #         - setWeight: 75                     # Set 75% of traffic to canary
+    #         - pause:
+    #             duration: 60s
+    #       analysis:                             # Analysis configuration for entire canary
+    #         templates:
+    #           - templateName: success-rate
+    #           - templateName: latency-p99
+    #         args:
+    #           - name: service-name
+    #             value: "backend-api"
+    #           - name: prometheus-server
+    #             valueFrom:
+    #               secretKeyRef:
+    #                 name: prometheus-config
+    #                 key: server-url
+    #         startingStep: 2                     # Step index to start analysis
+    #       trafficRouting:                       # Traffic routing configuration
+    #         nginx:                              # NGINX Ingress Controller routing
+    #           stableIngress: backend-stable     # Stable service ingress
+    #           annotationPrefix: nginx.ingress.kubernetes.io
+    #           additionalIngressAnnotations:
+    #             canary-by-header: "X-Canary"
+    #       scaleDownDelaySeconds: 600            # Delay before scaling down old ReplicaSet
+    #       abortScaleDownDelaySeconds: 30        # Delay before scaling down after abort
+    #     blueGreen:                              # Blue-Green deployment configuration
+    #       activeService: backend-active         # Service name for active (blue) version
+    #       previewService: backend-preview       # Service name for preview (green) version
+    #       autoPromotionEnabled: false           # Whether to auto-promote after successful analysis
+    #       scaleDownDelaySeconds: 300            # Delay before scaling down old version
+    #       prePromotionAnalysis:                 # Analysis before promoting green to blue
+    #         templates:
+    #           - templateName: success-rate
+    #           - templateName: latency-p99
+    #         args:
+    #           - name: service-name
+    #             value: "backend-api"
+    #       postPromotionAnalysis:                # Analysis after promoting green to blue
+    #         templates:
+    #           - templateName: success-rate
+    #         args:
+    #           - name: service-name
+    #             value: "backend-api"
+    #       previewReplicaCount: 1                # Number of replicas for preview environment
+    #       antiAffinity:                         # Anti-affinity rules between blue/green
+    #         preferredDuringSchedulingIgnoredDuringExecution:
+    #           - weight: 100
+    #             podAffinityTerm:
+    #               labelSelector:
+    #                 matchLabels:
+    #                   app.kubernetes.io/name: backend
+    #               topologyKey: kubernetes.io/hostname
+
+    # Example ArgoCD AnalysisTemplate configuration for advanced deployment strategies:
+    # analysisTemplate:
+    #   enabled: false                            # Enable AnalysisTemplate for this deployment
+    #   annotations:
+    #     analysis.argoproj.io/description: "Backend API performance analysis"
+    #   labels:
+    #     analysis-type: "performance"
+    #     tier: "backend"
+    #
+    #   # Arguments that can be passed to the analysis
+    #   args:
+    #     - name: service-name
+    #       value: "backend-service"
+    #     - name: namespace
+    #       valueFrom:
+    #         fieldRef:
+    #           fieldPath: metadata.namespace
+    #
+    #   # Metrics to analyze during deployment
+    #   metrics:
+    #     # Success rate metric using Prometheus
+    #     - name: success-rate
+    #       initialDelay: 30s                     # Wait 30s before starting analysis
+    #       interval: 30s                         # Check every 30s
+    #       count: 10                             # Run 10 measurements
+    #       successCondition: result[0] >= 0.95   # 95% success rate required
+    #       failureLimit: 3                       # Fail after 3 failed measurements
+    #       provider:
+    #         prometheus:
+    #           address: http://prometheus:9090
+    #           query: |
+    #             sum(rate(http_requests_total{job="{{args.service-name}}", code=~"2.."}[5m])) /
+    #             sum(rate(http_requests_total{job="{{args.service-name}}"}[5m]))
+    #
+    #     # Response time metric
+    #     - name: latency-p95
+    #       interval: 30s
+    #       count: 10
+    #       successCondition: result[0] <= 500    # P95 latency under 500ms
+    #       provider:
+    #         prometheus:
+    #           address: http://prometheus:9090
+    #           query: |
+    #             histogram_quantile(0.95,
+    #               sum(rate(http_request_duration_seconds_bucket{job="{{args.service-name}}"}[5m])) by (le)
+    #             ) * 1000
+    #
+    #     # Error rate metric with web provider
+    #     - name: error-rate-web
+    #       interval: 45s
+    #       count: 5
+    #       successCondition: result < 0.05       # Less than 5% error rate
+    #       provider:
+    #         web:
+    #           url: http://monitoring-api/metrics/errors?service={{args.service-name}}
+    #           headers:
+    #             - key: Authorization
+    #               value: Bearer {{args.api-token}}
+    #           jsonPath: "$.error_rate"
+    #           method: GET
+    #           timeoutSeconds: 10
+    #
+    #     # Custom job-based analysis
+    #     - name: custom-analysis
+    #       interval: 60s
+    #       count: 3
+    #       successCondition: result == "success"
+    #       provider:
+    #         job:
+    #           spec:
+    #             template:
+    #               spec:
+    #                 containers:
+    #                 - name: analysis
+    #                   image: mycompany/analysis-tool:v1.0.0
+    #                   command: ["/bin/sh"]
+    #                   args: ["-c", "analysis-script.sh {{args.service-name}}"]
+    #                 restartPolicy: Never
+    #             backoffLimit: 1
+    #
+    #   # Dry run configuration for testing
+    #   dryRun:
+    #     - metricName: success-rate
+    #     - metricName: latency-p95
+    #
+    #   # Measurement retention policy
+    #   measurementRetention:
+    #     - metricName: success-rate
+    #       limit: 100                            # Keep last 100 measurements
+    #     - metricName: latency-p95
+    #       limit: 50
+
+    # Example Prometheus ServiceMonitor configuration for metrics collection:
+    # serviceMonitor:
+    #   enabled: false                            # Enable ServiceMonitor for this deployment
+    #   namespace: monitoring                     # Optional: ServiceMonitor namespace (defaults to deployment namespace)
+    #   annotations:
+    #     monitoring.coreos.com/description: "Backend API metrics monitoring"
+    #   labels:
+    #     monitoring: "prometheus"
+    #     tier: "backend"
+    #     team: "platform"
+    #
+    #   # Service discovery configuration
+    #   jobLabel: "app.kubernetes.io/component"   # Label to use as job name in Prometheus
+    #   targetLabels:                             # Labels to copy from Service to target
+    #     - "app.kubernetes.io/version"
+    #     - "app.kubernetes.io/name"
+    #   podTargetLabels:                          # Labels to copy from Pod to target
+    #     - "app.kubernetes.io/instance"
+    #     - "pod-template-hash"
+    #
+    #   # Resource limits for Prometheus
+    #   sampleLimit: 10000                        # Maximum samples per scrape
+    #   targetLimit: 100                          # Maximum targets to scrape
+    #   labelLimit: 50                            # Maximum labels per sample
+    #   labelNameLengthLimit: 256                 # Maximum label name length
+    #   labelValueLengthLimit: 1024               # Maximum label value length
+    #
+    #   # Service selector (additional labels beyond the default component matching)
+    #   selector:
+    #     matchLabels:
+    #       prometheus.io/scrape: "true"          # Additional selector labels
+    #     matchExpressions:                       # Advanced selector expressions
+    #       - key: app.kubernetes.io/tier
+    #         operator: In
+    #         values: ["backend", "api"]
+    #
+    #   # Namespace selector for cross-namespace monitoring
+    #   namespaceSelector:
+    #     matchNames:
+    #       - default
+    #       - production
+    #       - staging
+    #
+    #   # Metrics endpoints configuration
+    #   endpoints:
+    #     # Main application metrics
+    #     - port: api                             # Service port name to scrape
+    #       path: /metrics                        # Metrics endpoint path
+    #       scheme: http                          # http or https
+    #       interval: 30s                         # Scrape interval
+    #       scrapeTimeout: 10s                    # Scrape timeout
+    #       honorLabels: false                    # Whether to honor labels from target
+    #       honorTimestamps: true                 # Whether to honor timestamps from target
+    #
+    #       # URL parameters for the metrics endpoint
+    #       params:
+    #         format: ["prometheus"]
+    #         module: ["http_2xx"]
+    #
+    #       # Authentication configuration
+    #       basicAuth:
+    #         username:
+    #           name: metrics-auth
+    #           key: username
+    #         password:
+    #           name: metrics-auth
+    #           key: password
+    #
+    #       # TLS configuration for HTTPS endpoints
+    #       tlsConfig:
+    #         ca:
+    #           secret:
+    #             name: ca-cert
+    #             key: ca.crt
+    #         cert:
+    #           secret:
+    #             name: client-cert
+    #             key: tls.crt
+    #         keySecret:
+    #           name: client-cert
+    #           key: tls.key
+    #         serverName: backend-api.example.com
+    #         insecureSkipVerify: false
+    #
+    #       # Metric and label transformations
+    #       metricRelabelings:
+    #         # Drop high-cardinality metrics
+    #         - sourceLabels: [__name__]
+    #           regex: "http_request_duration_seconds_bucket"
+    #           action: drop
+    #         # Rename metrics
+    #         - sourceLabels: [__name__]
+    #           regex: "app_(.+)"
+    #           targetLabel: __name__
+    #           replacement: "backend_${1}"
+    #
+    #       relabelings:
+    #         # Add custom labels
+    #         - targetLabel: cluster
+    #           replacement: production
+    #         # Copy service labels
+    #         - sourceLabels: [__meta_kubernetes_service_label_app_kubernetes_io_version]
+    #           targetLabel: version
+    #
+    #     # Additional metrics endpoint (e.g., for different metrics)
+    #     - port: admin                           # Admin/debug port
+    #       path: /debug/metrics
+    #       interval: 60s                         # Less frequent scraping
+    #       scrapeTimeout: 5s
+    #       honorLabels: true
+    #
+    #       # Bearer token authentication
+    #       bearerTokenSecret:
+    #         name: admin-token
+    #         key: token
+    #
+    #       # Custom relabelings for admin metrics
+    #       relabelings:
+    #         - targetLabel: metrics_type
+    #           replacement: admin
+    #         - sourceLabels: [__address__]
+    #           targetLabel: __tmp_address
+    #         - sourceLabels: [__tmp_address]
+    #           regex: "([^:]+):.*"
+    #           targetLabel: instance
+    #           replacement: "${1}"
+
   # Example ConfigMap configuration:
   # app-config:
   #   enabled: true
@@ -230,6 +529,404 @@ deployments: # {}
   #           key: url
   #     - name: BACKUP_RETENTION_DAYS
   #       value: "30"
+
+# Multiple StatefulSets configuration
+# This allows deploying stateful applications like databases, message queues, etc.
+# Each StatefulSet MUST have its own image configuration and volume claim templates
+statefulsets: # {}
+  # Example PostgreSQL database configuration:
+  # database:
+  #   enabled: true
+  #   replicaCount: 3
+  #   image:
+  #     repository: postgres
+  #     tag: "13"
+  #     pullPolicy: IfNotPresent
+  #
+  #   # StatefulSet specific configuration
+  #   serviceName: "postgres-headless"        # Headless service name for StatefulSet
+  #   podManagementPolicy: "OrderedReady"     # OrderedReady or Parallel
+  #   updateStrategy:
+  #     type: RollingUpdate
+  #     rollingUpdate:
+  #       maxUnavailable: 1
+  #   revisionHistoryLimit: 5
+  #
+  #   ports:
+  #     - name: postgres
+  #       containerPort: 5432
+  #       protocol: TCP
+  #
+  #   env:
+  #     - name: POSTGRES_DB
+  #       value: "testdb"
+  #     - name: POSTGRES_USER
+  #       value: "testuser"
+  #     - name: POSTGRES_PASSWORD
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: postgres-secret
+  #           key: password
+  #
+  #   volumeMounts:
+  #     - name: postgres-data
+  #       mountPath: /var/lib/postgresql/data
+  #       subPath: postgres
+  #
+  #   # Persistent Volume Claim Templates (required for StatefulSets)
+  #   volumeClaimTemplates:
+  #     - metadata:
+  #         name: postgres-data
+  #       spec:
+  #         accessModes: ["ReadWriteOnce"]
+  #         storageClassName: "standard"
+  #         resources:
+  #           requests:
+  #             storage: 10Gi
+  #
+  #   # Health checks
+  #   livenessProbe:
+  #     exec:
+  #       command:
+  #         - /bin/sh
+  #         - -c
+  #         - pg_isready -U testuser -d testdb
+  #     initialDelaySeconds: 60
+  #     periodSeconds: 30
+  #     timeoutSeconds: 10
+  #     failureThreshold: 3
+  #
+  #   readinessProbe:
+  #     exec:
+  #       command:
+  #         - /bin/sh
+  #         - -c
+  #         - pg_isready -U testuser -d testdb
+  #     initialDelaySeconds: 30
+  #     periodSeconds: 10
+  #     timeoutSeconds: 5
+  #     failureThreshold: 3
+  #
+  #   resources:
+  #     requests:
+  #       memory: "256Mi"
+  #       cpu: "250m"
+  #     limits:
+  #       memory: "512Mi"
+  #       cpu: "500m"
+
+  # Example Redis cluster configuration:
+  # redis:
+  #   enabled: true
+  #   replicaCount: 3
+  #   image:
+  #     repository: redis
+  #     tag: "7-alpine"
+  #     pullPolicy: IfNotPresent
+  #
+  #   serviceName: "redis-headless"
+  #   podManagementPolicy: "Parallel"          # Faster scaling for Redis
+  #
+  #   updateStrategy:
+  #     type: RollingUpdate
+  #     rollingUpdate:
+  #       partition: 0                         # Allow rolling updates
+  #
+  #   ports:
+  #     - name: redis
+  #       containerPort: 6379
+  #       protocol: TCP
+  #
+  #   command:
+  #     - redis-server
+  #     - /etc/redis/redis.conf
+  #
+  #   env:
+  #     - name: REDIS_REPLICATION_MODE
+  #       value: "master"
+  #     - name: REDIS_PASSWORD
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: redis-secret
+  #           key: password
+  #
+  #   volumeMounts:
+  #     - name: redis-data
+  #       mountPath: /data
+  #     - name: redis-config
+  #       mountPath: /etc/redis
+  #
+  #   volumes:
+  #     - name: redis-config
+  #       configMap:
+  #         name: redis-config
+  #
+  #   volumeClaimTemplates:
+  #     - metadata:
+  #         name: redis-data
+  #       spec:
+  #         accessModes: ["ReadWriteOnce"]
+  #         resources:
+  #           requests:
+  #             storage: 5Gi
+  #
+  #   livenessProbe:
+  #     tcpSocket:
+  #       port: 6379
+  #     initialDelaySeconds: 30
+  #     periodSeconds: 10
+  #
+  #   readinessProbe:
+  #     exec:
+  #       command:
+  #         - redis-cli
+  #         - ping
+  #     initialDelaySeconds: 5
+  #     periodSeconds: 5
+  #
+  #   resources:
+  #     requests:
+  #       memory: "128Mi"
+  #       cpu: "100m"
+  #     limits:
+  #       memory: "256Mi"
+  #       cpu: "200m"
+
+  # Example Elasticsearch cluster configuration:
+  # elasticsearch:
+  #   enabled: false
+  #   replicaCount: 3
+  #   image:
+  #     repository: elasticsearch
+  #     tag: "8.8.0"
+  #     pullPolicy: IfNotPresent
+  #
+  #   serviceName: "elasticsearch-headless"
+  #   podManagementPolicy: "OrderedReady"
+  #
+  #   ports:
+  #     - name: http
+  #       containerPort: 9200
+  #       protocol: TCP
+  #     - name: transport
+  #       containerPort: 9300
+  #       protocol: TCP
+  #
+  #   env:
+  #     - name: cluster.name
+  #       value: "elasticsearch-cluster"
+  #     - name: node.name
+  #       valueFrom:
+  #         fieldRef:
+  #           fieldPath: metadata.name
+  #     - name: discovery.seed_hosts
+  #       value: "elasticsearch-headless"
+  #     - name: cluster.initial_master_nodes
+  #       value: "elasticsearch-0,elasticsearch-1,elasticsearch-2"
+  #     - name: ES_JAVA_OPTS
+  #       value: "-Xms512m -Xmx512m"
+  #
+  #   volumeMounts:
+  #     - name: elasticsearch-data
+  #       mountPath: /usr/share/elasticsearch/data
+  #
+  #   volumeClaimTemplates:
+  #     - metadata:
+  #         name: elasticsearch-data
+  #       spec:
+  #         accessModes: ["ReadWriteOnce"]
+  #         storageClassName: "fast-ssd"
+  #         resources:
+  #           requests:
+  #             storage: 20Gi
+  #
+  #   # Advanced security context for Elasticsearch
+  #   securityContext:
+  #     fsGroup: 1000
+  #     runAsUser: 1000
+  #     runAsNonRoot: true
+  #
+  #   # Pod annotations for log collection
+  #   podAnnotations:
+  #     co.elastic.logs/enabled: "true"
+  #
+  #   # Anti-affinity to spread pods across nodes
+  #   affinity:
+  #     podAntiAffinity:
+  #       preferredDuringSchedulingIgnoredDuringExecution:
+  #       - weight: 100
+  #         podAffinityTerm:
+  #           labelSelector:
+  #             matchExpressions:
+  #             - key: app.kubernetes.io/component
+  #               operator: In
+  #               values:
+  #               - elasticsearch
+  #           topologyKey: kubernetes.io/hostname
+  #
+  #   resources:
+  #     requests:
+  #       memory: "1Gi"
+  #       cpu: "500m"
+  #     limits:
+  #       memory: "2Gi"
+  #       cpu: "1000m"
+
+  # Example MongoDB replica set configuration:
+  # mongodb:
+  #   enabled: false
+  #   replicaCount: 3
+  #   image:
+  #     repository: mongo
+  #     tag: "5.0"
+  #     pullPolicy: IfNotPresent
+  #
+  #   serviceName: "mongodb-headless"
+  #   podManagementPolicy: "OrderedReady"
+  #
+  #   ports:
+  #     - name: mongodb
+  #       containerPort: 27017
+  #       protocol: TCP
+  #
+  #   command:
+  #     - mongod
+  #     - --replSet
+  #     - rs0
+  #     - --bind_ip_all
+  #
+  #   env:
+  #     - name: MONGO_INITDB_ROOT_USERNAME
+  #       value: "admin"
+  #     - name: MONGO_INITDB_ROOT_PASSWORD
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: mongodb-secret
+  #           key: password
+  #
+  #   volumeMounts:
+  #     - name: mongodb-data
+  #       mountPath: /data/db
+  #
+  #   volumeClaimTemplates:
+  #     - metadata:
+  #         name: mongodb-data
+  #       spec:
+  #         accessModes: ["ReadWriteOnce"]
+  #         resources:
+  #           requests:
+  #             storage: 15Gi
+  #
+  #   livenessProbe:
+  #     exec:
+  #       command:
+  #         - mongo
+  #         - --eval
+  #         - "db.adminCommand('ping')"
+  #     initialDelaySeconds: 60
+  #     periodSeconds: 30
+  #
+  #   readinessProbe:
+  #     exec:
+  #       command:
+  #         - mongo
+  #         - --eval
+  #         - "db.adminCommand('ping')"
+  #     initialDelaySeconds: 30
+  #     periodSeconds: 10
+  #
+  #   resources:
+  #     requests:
+  #       memory: "512Mi"
+  #       cpu: "300m"
+  #     limits:
+  #       memory: "1Gi"
+  #       cpu: "600m"
+
+  # Example configuration with init containers and additional containers:
+  # kafka:
+  #   enabled: false
+  #   replicaCount: 3
+  #   image:
+  #     repository: confluentinc/cp-kafka
+  #     tag: "7.4.0"
+  #     pullPolicy: IfNotPresent
+  #
+  #   serviceName: "kafka-headless"
+  #   podManagementPolicy: "OrderedReady"
+  #
+  #   # Init container to wait for Zookeeper
+  #   initContainers:
+  #     - name: wait-for-zookeeper
+  #       image: busybox:1.35
+  #       command:
+  #         - sh
+  #         - -c
+  #         - "until nc -z zookeeper-headless 2181; do echo waiting for zookeeper; sleep 2; done;"
+  #
+  #   ports:
+  #     - name: kafka
+  #       containerPort: 9092
+  #       protocol: TCP
+  #     - name: jmx
+  #       containerPort: 9999
+  #       protocol: TCP
+  #
+  #   env:
+  #     - name: KAFKA_BROKER_ID
+  #       valueFrom:
+  #         fieldRef:
+  #           fieldPath: metadata.name
+  #     - name: KAFKA_ZOOKEEPER_CONNECT
+  #       value: "zookeeper-headless:2181"
+  #     - name: KAFKA_ADVERTISED_LISTENERS
+  #       value: "PLAINTEXT://$(POD_NAME).kafka-headless:9092"
+  #     - name: KAFKA_LISTENERS
+  #       value: "PLAINTEXT://0.0.0.0:9092"
+  #     - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+  #       value: "3"
+  #     - name: POD_NAME
+  #       valueFrom:
+  #         fieldRef:
+  #           fieldPath: metadata.name
+  #
+  #   volumeMounts:
+  #     - name: kafka-data
+  #       mountPath: /var/lib/kafka/data
+  #
+  #   volumeClaimTemplates:
+  #     - metadata:
+  #         name: kafka-data
+  #       spec:
+  #         accessModes: ["ReadWriteOnce"]
+  #         resources:
+  #           requests:
+  #             storage: 25Gi
+  #
+  #   # Additional sidecar container for monitoring
+  #   additionalContainers:
+  #     - name: jmx-exporter
+  #       image: sscaling/jmx-prometheus-exporter:0.17.2
+  #       ports:
+  #         - name: metrics
+  #           containerPort: 8080
+  #       volumeMounts:
+  #         - name: jmx-config
+  #           mountPath: /opt/jmx_exporter/config.yml
+  #           subPath: config.yml
+  #
+  #   volumes:
+  #     - name: jmx-config
+  #       configMap:
+  #         name: kafka-jmx-config
+  #
+  #   resources:
+  #     requests:
+  #       memory: "1Gi"
+  #       cpu: "500m"
+  #     limits:
+  #       memory: "2Gi"
+  #       cpu: "1000m"
 
   # Example ExternalSecret configuration:
   # app-secrets:
@@ -447,3 +1144,428 @@ externalSecrets:
     #         - regexp:
     #             source: "(.*)_key$"
     #             target: "$1_API_KEY"
+
+# Global Certificates (shared across all deployments)
+certificates:
+  enabled: false
+  certs: {}
+    # Example Certificate configuration (requires cert-manager):
+    # backend-tls-cert:
+    #   enabled: true
+    #   secretName: backend-tls-cert              # Optional: custom secret name
+    #   issuerRef:
+    #     name: letsencrypt-prod                  # Required: issuer name
+    #     kind: ClusterIssuer                     # Optional: ClusterIssuer (default) or Issuer
+    #     group: cert-manager.io                  # Optional: issuer group
+    #   commonName: api.example.com               # Optional: certificate common name
+    #   dnsNames:                                 # Optional: DNS names
+    #     - api.example.com
+    #     - backend.example.com
+    #   ipAddresses:                              # Optional: IP addresses
+    #     - 192.168.1.100
+    #   uris:                                     # Optional: URI SANs
+    #     - https://api.example.com/health
+    #   emailAddresses:                           # Optional: email addresses (for S/MIME)
+    #     - admin@example.com
+    #   duration: 2160h                           # Optional: certificate duration (90 days)
+    #   renewBefore: 720h                         # Optional: renew before expiry (30 days)
+    #   subject:                                  # Optional: certificate subject
+    #     organizations:
+    #       - MyCompany Inc
+    #     countries:
+    #       - US
+    #     organizationalUnits:
+    #       - IT Department
+    #     localities:
+    #       - San Francisco
+    #     provinces:
+    #       - California
+    #   privateKey:                               # Optional: private key configuration
+    #     algorithm: RSA                          # RSA, ECDSA, Ed25519
+    #     size: 2048                              # Key size (2048, 4096 for RSA; 256, 384 for ECDSA)
+    #     rotationPolicy: Always                  # Always or Never
+    #   usages:                                   # Optional: key usages
+    #     - digital signature
+    #     - key encipherment
+    #     - server auth
+    #   isCA: false                               # Optional: CA certificate flag
+    #   keystores:                                # Optional: keystore generation (for Java apps)
+    #     jks:
+    #       create: true
+    #       passwordSecretRef:
+    #         name: keystore-password
+    #         key: password
+    #     pkcs12:
+    #       create: true
+    #       passwordSecretRef:
+    #         name: keystore-password
+    #         key: password
+    #   additionalOutputFormats:                  # Optional: additional output formats
+    #     - type: CombinedPEM
+    #     - type: DER
+    #   revisionHistoryLimit: 3                   # Optional: number of certificate revisions to keep
+  #   annotations:                              # Optional: certificate annotations
+  #     cert-manager.io/revision-history-limit: "3"
+
+# Global Persistent Volumes (shared across all deployments and statefulsets)
+persistentVolumes:
+  enabled: false
+  volumes: {}
+    # Example Persistent Volume configurations:
+    #
+    # local-storage:
+    #   enabled: true
+    #   capacity:
+    #     storage: 50Gi
+    #   accessModes:
+    #     - ReadWriteOnce
+    #   persistentVolumeReclaimPolicy: Retain        # Retain, Delete, Recycle
+    #   storageClassName: "local-storage"            # Optional: storage class
+    #   volumeMode: Filesystem                       # Filesystem or Block
+    #   local:
+    #     path: /mnt/storage/local-pv
+    #   nodeAffinity:
+    #     required:
+    #       nodeSelectorTerms:
+    #       - matchExpressions:
+    #         - key: kubernetes.io/hostname
+    #           operator: In
+    #           values:
+    #           - worker-node-1
+    #   annotations:
+    #     pv.kubernetes.io/provisioned-by: "local-volume-provisioner"
+    #   labels:
+    #     storage-type: "local"
+    #     performance: "high"
+    #
+    # nfs-shared:
+    #   enabled: true
+    #   capacity:
+    #     storage: 100Gi
+    #   accessModes:
+    #     - ReadWriteMany                          # Multiple pods can read/write
+    #   persistentVolumeReclaimPolicy: Retain
+    #   storageClassName: "nfs"
+    #   mountOptions:                              # NFS mount options
+    #     - hard
+    #     - nfsvers=4.1
+    #     - timeo=600
+    #     - retrans=2
+    #   nfs:
+    #     server: nfs.example.com                  # NFS server address
+    #     path: /shared/storage                    # NFS export path
+    #   annotations:
+    #     pv.kubernetes.io/provisioned-by: "nfs-provisioner"
+    #   labels:
+    #     storage-type: "nfs"
+    #     shared: "true"
+    #
+    # aws-ebs:
+    #   enabled: false
+    #   capacity:
+    #     storage: 20Gi
+    #   accessModes:
+    #     - ReadWriteOnce
+    #   persistentVolumeReclaimPolicy: Delete
+    #   storageClassName: "gp3"
+    #   awsElasticBlockStore:
+    #     volumeID: vol-0123456789abcdef0          # AWS EBS Volume ID
+    #     fsType: ext4                             # File system type
+    #   nodeAffinity:
+    #     required:
+    #       nodeSelectorTerms:
+    #       - matchExpressions:
+    #         - key: topology.kubernetes.io/zone
+    #           operator: In
+    #           values:
+    #           - us-west-2a
+    #   annotations:
+    #     pv.kubernetes.io/provisioned-by: "ebs.csi.aws.com"
+    #   labels:
+    #     storage-type: "ebs"
+    #     cloud-provider: "aws"
+    #
+    # azure-disk:
+    #   enabled: false
+    #   capacity:
+    #     storage: 30Gi
+    #   accessModes:
+    #     - ReadWriteOnce
+    #   persistentVolumeReclaimPolicy: Delete
+    #   storageClassName: "managed-premium"
+    #   azureDisk:
+    #     diskName: mydata-disk                    # Azure disk name
+    #     diskURI: /subscriptions/sub-id/resourceGroups/rg/providers/Microsoft.Compute/disks/mydata-disk
+    #     cachingMode: ReadOnly                    # None, ReadOnly, ReadWrite
+    #     fsType: ext4
+    #     readOnly: false
+    #   nodeAffinity:
+    #     required:
+    #       nodeSelectorTerms:
+    #       - matchExpressions:
+    #         - key: topology.kubernetes.io/zone
+    #           operator: In
+    #           values:
+    #           - eastus-1
+    #   annotations:
+    #     pv.kubernetes.io/provisioned-by: "disk.csi.azure.com"
+    #   labels:
+    #     storage-type: "azure-disk"
+    #     cloud-provider: "azure"
+    #
+    # gce-persistent-disk:
+    #   enabled: false
+    #   capacity:
+    #     storage: 25Gi
+    #   accessModes:
+    #     - ReadWriteOnce
+    #   persistentVolumeReclaimPolicy: Delete
+    #   storageClassName: "ssd"
+    #   gcePersistentDisk:
+    #     pdName: gce-disk-1                       # GCE Persistent Disk name
+    #     fsType: ext4
+    #     readOnly: false
+    #   nodeAffinity:
+    #     required:
+    #       nodeSelectorTerms:
+    #       - matchExpressions:
+    #         - key: topology.kubernetes.io/zone
+    #           operator: In
+    #           values:
+    #           - us-central1-a
+    #   annotations:
+    #     pv.kubernetes.io/provisioned-by: "pd.csi.storage.gke.io"
+    #   labels:
+    #     storage-type: "gce-pd"
+    #     cloud-provider: "gcp"
+    #
+    # csi-volume:
+    #   enabled: false
+    #   capacity:
+    #     storage: 15Gi
+    #   accessModes:
+    #     - ReadWriteOnce
+    #   persistentVolumeReclaimPolicy: Delete
+    #   storageClassName: "csi-storage"
+    #   volumeMode: Filesystem
+    #   csi:
+    #     driver: example.csi.driver              # CSI driver name
+    #     volumeHandle: vol-unique-id             # Unique volume identifier
+    #     readOnly: false
+    #     fsType: ext4
+    #     volumeAttributes:                        # Driver-specific attributes
+    #       storage.kubernetes.io/csiProvisionerIdentity: "unique-id"
+    #       type: "gp3"
+    #       iops: "3000"
+    #     controllerPublishSecretRef:             # Optional secrets for CSI
+    #       name: csi-secret
+    #       namespace: kube-system
+    #     nodeStageSecretRef:
+    #       name: csi-secret
+    #       namespace: kube-system
+    #     nodePublishSecretRef:
+    #       name: csi-secret
+    #       namespace: kube-system
+    #   annotations:
+    #     pv.kubernetes.io/provisioned-by: "example.csi.driver"
+    #   labels:
+    #     storage-type: "csi"
+    #     driver: "example-csi"
+    #
+    # hostpath-dev:
+    #   enabled: false                            # Only for development/testing
+    #   capacity:
+    #     storage: 10Gi
+    #   accessModes:
+    #     - ReadWriteOnce
+    #   persistentVolumeReclaimPolicy: Delete
+    #   storageClassName: "hostpath"
+    #   hostPath:
+    #     path: /tmp/hostpath-storage             # Host directory path
+    #     type: DirectoryOrCreate                 # Directory, DirectoryOrCreate, FileOrCreate, etc.
+    #   nodeAffinity:
+    #     required:
+    #       nodeSelectorTerms:
+    #       - matchExpressions:
+    #         - key: kubernetes.io/hostname
+    #           operator: In
+    #           values:
+    #           - minikube                        # Specific to development nodes
+    #   annotations:
+    #     pv.kubernetes.io/provisioned-by: "kubernetes.io/host-path"
+    #   labels:
+    #     storage-type: "hostpath"
+    #     environment: "development"
+    #
+    # Example with pre-bound claim reference:
+    # database-storage:
+    #   enabled: false
+    #   capacity:
+    #     storage: 50Gi
+    #   accessModes:
+    #     - ReadWriteOnce
+    #   persistentVolumeReclaimPolicy: Retain
+    #   storageClassName: "fast-ssd"
+    #   local:
+    #     path: /mnt/database-storage
+    #   nodeAffinity:
+    #     required:
+    #       nodeSelectorTerms:
+    #       - matchExpressions:
+    #         - key: kubernetes.io/hostname
+    #           operator: In
+    #           values:
+    #           - database-node
+    #   claimRef:                                 # Pre-bind to specific PVC
+    #     name: database-pvc
+    #     namespace: production
+    #   annotations:
+    #     pv.kubernetes.io/provisioned-by: "local-volume-provisioner"
+  #   labels:
+  #     storage-type: "local"
+  #     usage: "database"
+  #     tier: "production"
+
+# Global Persistent Volume Claims (shared across all deployments and statefulsets)
+persistentVolumeClaims:
+  enabled: false
+  claims: {}
+    # Example Persistent Volume Claim configurations:
+    #
+    # app-data:
+    #   enabled: true
+    #   accessModes:
+    #     - ReadWriteOnce
+    #   resources:
+    #     requests:
+    #       storage: 10Gi
+    #     limits:                                 # Optional: storage limits
+    #       storage: 20Gi
+    #   storageClassName: "fast-ssd"             # Optional: storage class
+    #   volumeMode: Filesystem                   # Filesystem or Block
+    #   annotations:
+    #     volume.beta.kubernetes.io/storage-class: "fast-ssd"
+    #   labels:
+    #     app: "myapp"
+    #     tier: "data"
+    #
+    # shared-storage:
+    #   enabled: true
+    #   accessModes:
+    #     - ReadWriteMany                        # Shared across multiple pods
+    #   resources:
+    #     requests:
+    #       storage: 50Gi
+    #   storageClassName: "nfs"
+    #   volumeName: "nfs-shared-pv"             # Bind to specific PV
+    #   annotations:
+    #     volume.kubernetes.io/storage-provisioner: "nfs-provisioner"
+    #   labels:
+    #     storage-type: "nfs"
+    #     shared: "true"
+    #
+    # database-storage:
+    #   enabled: true
+    #   accessModes:
+    #     - ReadWriteOnce
+    #   resources:
+    #     requests:
+    #       storage: 100Gi
+    #   storageClassName: "local-storage"
+    #   volumeName: "database-storage-pv"       # Bind to specific PV
+    #   selector:                               # Select PV by labels
+    #     matchLabels:
+    #       usage: "database"
+    #       tier: "production"
+    #   annotations:
+    #     volume.beta.kubernetes.io/storage-class: "local-storage"
+    #   labels:
+    #     app: "database"
+    #     environment: "production"
+    #
+    # backup-storage:
+    #   enabled: true
+    #   accessModes:
+    #     - ReadWriteOnce
+    #   resources:
+    #     requests:
+    #       storage: 200Gi
+    #   storageClassName: "standard"
+    #   dataSource:                             # Clone from existing volume
+    #     name: source-pvc
+    #     kind: PersistentVolumeClaim
+    #   annotations:
+    #     volume.kubernetes.io/storage-provisioner: "kubernetes.io/aws-ebs"
+    #   labels:
+    #     app: "backup"
+    #     purpose: "disaster-recovery"
+    #
+    # snapshot-restore:
+    #   enabled: false
+    #   accessModes:
+    #     - ReadWriteOnce
+    #   resources:
+    #     requests:
+    #       storage: 50Gi
+    #   storageClassName: "snapshot-class"
+    #   dataSourceRef:                          # Restore from volume snapshot
+    #     name: app-snapshot-20240101
+    #     kind: VolumeSnapshot
+    #     apiGroup: snapshot.storage.k8s.io
+    #   annotations:
+    #     snapshot.storage.kubernetes.io/restore-size: "50Gi"
+    #   labels:
+    #     app: "myapp"
+    #     restored-from: "snapshot"
+    #
+    # ephemeral-cache:
+    #   enabled: false
+    #   accessModes:
+    #     - ReadWriteOnce
+    #   resources:
+    #     requests:
+    #       storage: 5Gi
+    #   storageClassName: "fast-ephemeral"
+    #   volumeMode: Filesystem
+    #   annotations:
+    #     volume.kubernetes.io/ephemeral: "true"
+    #   labels:
+    #     app: "cache"
+    #     type: "ephemeral"
+    #
+    # block-storage:
+    #   enabled: false
+    #   accessModes:
+    #     - ReadWriteOnce
+    #   resources:
+    #     requests:
+    #       storage: 100Gi
+    #   storageClassName: "block-storage"
+    #   volumeMode: Block                       # Raw block device
+    #   annotations:
+    #     volume.kubernetes.io/storage-class: "block-storage"
+    #   labels:
+    #     app: "database"
+    #     mode: "block"
+    #
+    # multi-zone-storage:
+    #   enabled: false
+    #   accessModes:
+    #     - ReadWriteOnce
+    #   resources:
+    #     requests:
+    #       storage: 30Gi
+    #   storageClassName: "multi-zone"
+    #   selector:
+    #     matchExpressions:
+    #       - key: topology.kubernetes.io/zone
+    #         operator: In
+    #         values:
+    #           - us-west-2a
+    #           - us-west-2b
+    #           - us-west-2c
+    #   annotations:
+    #     volume.kubernetes.io/selected-node: "auto"
+    #   labels:
+    #     app: "distributed-app"
+    #     replication: "multi-zone"

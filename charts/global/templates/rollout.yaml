@@ -1,0 +1,381 @@
+{{/*
+Support for Rollout per deployment - iterate over deployments map
+Creates ArgoCD Rollout resources for advanced deployment strategies
+*/}}
+{{- range $deploymentName, $deployment := .Values.deployments }}
+{{- if and (kindOf $deployment | eq "map") ($deployment.enabled) ($deployment.rollout) ($deployment.rollout.enabled) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: {{ include "global.fullname" $ }}-{{ $deploymentName }}-rollout
+  namespace: {{ $deployment.namespace | default $.Values.namespace | default $.Release.Namespace }}
+  labels:
+    {{- include "global.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $deploymentName }}
+    {{- with $deployment.rollout.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with $deployment.rollout.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ $deployment.replicaCount | default 1 }}
+  {{- if $deployment.rollout.revisionHistoryLimit }}
+  revisionHistoryLimit: {{ $deployment.rollout.revisionHistoryLimit }}
+  {{- end }}
+  {{- if $deployment.rollout.progressDeadlineSeconds }}
+  progressDeadlineSeconds: {{ $deployment.rollout.progressDeadlineSeconds }}
+  {{- end }}
+  {{- if $deployment.rollout.restartAt }}
+  restartAt: {{ $deployment.rollout.restartAt }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "global.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: {{ $deploymentName }}
+  template:
+    metadata:
+      {{- with $deployment.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "global.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: {{ $deploymentName }}
+        {{- with $deployment.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with ($deployment.imagePullSecrets | default $.Values.imagePullSecrets) }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ ($deployment.serviceAccount | default dict).name | default (include "global.serviceAccountName" $) }}
+      {{- with ($deployment.securityContext | default $.Values.securityContext) }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ($deployment.initContainers) }}
+      initContainers:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ $deploymentName }}
+          image: {{ ($deployment.image | default dict).registry | default "" }}{{ if ($deployment.image | default dict).registry }}/{{ end }}{{ ($deployment.image | default dict).repository | default "nginx" }}:{{ ($deployment.image | default dict).tag | default $.Chart.AppVersion }}
+          imagePullPolicy: {{ ($deployment.image | default dict).pullPolicy | default "IfNotPresent" }}
+          {{- with ($deployment.containerSecurityContext | default $.Values.containerSecurityContext) }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if $deployment.command }}
+          command:
+            {{- range $deployment.command }}
+            - {{ . | quote }}
+            {{- end }}
+          {{- end }}
+          {{- if $deployment.args }}
+          args:
+            {{- range $deployment.args }}
+            - {{ . | quote }}
+            {{- end }}
+          {{- end }}
+          {{- if $deployment.ports }}
+          ports:
+            {{- range $deployment.ports }}
+            - name: {{ .name }}
+              containerPort: {{ .containerPort }}
+              protocol: {{ .protocol | default "TCP" }}
+            {{- end }}
+          {{- end }}
+          {{- if $deployment.env }}
+          env:
+            {{- range $deployment.env }}
+            - name: {{ .name }}
+              {{- if .value }}
+              value: {{ .value | quote }}
+              {{- end }}
+              {{- if .valueFrom }}
+              valueFrom:
+                {{- toYaml .valueFrom | nindent 16 }}
+              {{- end }}
+            {{- end }}
+          {{- end }}
+          {{- if $deployment.envFrom }}
+          envFrom:
+            {{- toYaml $deployment.envFrom | nindent 12 }}
+          {{- end }}
+          {{- if $deployment.livenessProbe }}
+          livenessProbe:
+            {{- toYaml $deployment.livenessProbe | nindent 12 }}
+          {{- end }}
+          {{- if $deployment.readinessProbe }}
+          readinessProbe:
+            {{- toYaml $deployment.readinessProbe | nindent 12 }}
+          {{- end }}
+          {{- if $deployment.startupProbe }}
+          startupProbe:
+            {{- toYaml $deployment.startupProbe | nindent 12 }}
+          {{- end }}
+          {{- with ($deployment.resources | default $.Values.resources) }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if $deployment.volumeMounts }}
+          volumeMounts:
+            {{- toYaml $deployment.volumeMounts | nindent 12 }}
+          {{- end }}
+          {{- if $deployment.lifecycle }}
+          lifecycle:
+            {{- toYaml $deployment.lifecycle | nindent 12 }}
+          {{- end }}
+        {{- if $deployment.additionalContainers }}
+        {{- toYaml $deployment.additionalContainers | nindent 8 }}
+        {{- end }}
+      {{- if $deployment.volumes }}
+      volumes:
+        {{- toYaml $deployment.volumes | nindent 8 }}
+      {{- end }}
+      {{- with ($deployment.nodeSelector | default $.Values.nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ($deployment.affinity | default $.Values.affinity) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ($deployment.tolerations | default $.Values.tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ($deployment.topologySpreadConstraints | default $.Values.topologySpreadConstraints) }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if $deployment.hostAliases }}
+      hostAliases:
+        {{- toYaml $deployment.hostAliases | nindent 8 }}
+      {{- end }}
+      {{- if $deployment.dnsPolicy }}
+      dnsPolicy: {{ $deployment.dnsPolicy }}
+      {{- end }}
+      {{- if $deployment.dnsConfig }}
+      dnsConfig:
+        {{- toYaml $deployment.dnsConfig | nindent 8 }}
+      {{- end }}
+      {{- if $deployment.priorityClassName }}
+      priorityClassName: {{ $deployment.priorityClassName }}
+      {{- end }}
+      {{- if $deployment.restartPolicy }}
+      restartPolicy: {{ $deployment.restartPolicy }}
+      {{- end }}
+      {{- if $deployment.terminationGracePeriodSeconds }}
+      terminationGracePeriodSeconds: {{ $deployment.terminationGracePeriodSeconds }}
+      {{- end }}
+  strategy:
+    {{- if eq ($deployment.rollout.strategy.type | default "canary") "canary" }}
+    canary:
+      {{- if $deployment.rollout.strategy.canary.maxSurge }}
+      maxSurge: {{ $deployment.rollout.strategy.canary.maxSurge }}
+      {{- end }}
+      {{- if $deployment.rollout.strategy.canary.maxUnavailable }}
+      maxUnavailable: {{ $deployment.rollout.strategy.canary.maxUnavailable }}
+      {{- end }}
+      {{- if $deployment.rollout.strategy.canary.steps }}
+      steps:
+        {{- range $deployment.rollout.strategy.canary.steps }}
+        - {{- if .setWeight }}
+          setWeight: {{ .setWeight }}
+          {{- end }}
+          {{- if .pause }}
+          pause:
+            {{- if .pause.duration }}
+            duration: {{ .pause.duration }}
+            {{- end }}
+          {{- end }}
+          {{- if .setCanaryScale }}
+          setCanaryScale:
+            {{- if .setCanaryScale.weight }}
+            weight: {{ .setCanaryScale.weight }}
+            {{- end }}
+            {{- if .setCanaryScale.replicas }}
+            replicas: {{ .setCanaryScale.replicas }}
+            {{- end }}
+            {{- if .setCanaryScale.matchTrafficWeight }}
+            matchTrafficWeight: {{ .setCanaryScale.matchTrafficWeight }}
+            {{- end }}
+          {{- end }}
+          {{- if .setHeaderRoute }}
+          setHeaderRoute:
+            {{- toYaml .setHeaderRoute | nindent 12 }}
+          {{- end }}
+          {{- if .setMirrorRoute }}
+          setMirrorRoute:
+            {{- toYaml .setMirrorRoute | nindent 12 }}
+          {{- end }}
+          {{- if .analysis }}
+          analysis:
+            {{- if .analysis.templates }}
+            templates:
+              {{- range .analysis.templates }}
+              - templateName: {{ .templateName }}
+                {{- if .clusterScope }}
+                clusterScope: {{ .clusterScope }}
+                {{- end }}
+              {{- end }}
+            {{- end }}
+            {{- if .analysis.args }}
+            args:
+              {{- range .analysis.args }}
+              - name: {{ .name }}
+                {{- if .value }}
+                value: {{ .value | quote }}
+                {{- end }}
+                {{- if .valueFrom }}
+                valueFrom:
+                  {{- toYaml .valueFrom | nindent 18 }}
+                {{- end }}
+              {{- end }}
+            {{- end }}
+          {{- end }}
+          {{- if .experiment }}
+          experiment:
+            {{- toYaml .experiment | nindent 12 }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- if $deployment.rollout.strategy.canary.analysis }}
+      analysis:
+        {{- if $deployment.rollout.strategy.canary.analysis.templates }}
+        templates:
+          {{- range $deployment.rollout.strategy.canary.analysis.templates }}
+          - templateName: {{ .templateName }}
+            {{- if .clusterScope }}
+            clusterScope: {{ .clusterScope }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
+        {{- if $deployment.rollout.strategy.canary.analysis.args }}
+        args:
+          {{- range $deployment.rollout.strategy.canary.analysis.args }}
+          - name: {{ .name }}
+            {{- if .value }}
+            value: {{ .value | quote }}
+            {{- end }}
+            {{- if .valueFrom }}
+            valueFrom:
+              {{- toYaml .valueFrom | nindent 14 }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
+        {{- if $deployment.rollout.strategy.canary.analysis.startingStep }}
+        startingStep: {{ $deployment.rollout.strategy.canary.analysis.startingStep }}
+        {{- end }}
+      {{- end }}
+      {{- if $deployment.rollout.strategy.canary.antiAffinity }}
+      antiAffinity:
+        {{- toYaml $deployment.rollout.strategy.canary.antiAffinity | nindent 8 }}
+      {{- end }}
+      {{- if $deployment.rollout.strategy.canary.trafficRouting }}
+      trafficRouting:
+        {{- if $deployment.rollout.strategy.canary.trafficRouting.istio }}
+        istio:
+          {{- toYaml $deployment.rollout.strategy.canary.trafficRouting.istio | nindent 10 }}
+        {{- else if $deployment.rollout.strategy.canary.trafficRouting.nginx }}
+        nginx:
+          {{- toYaml $deployment.rollout.strategy.canary.trafficRouting.nginx | nindent 10 }}
+        {{- else if $deployment.rollout.strategy.canary.trafficRouting.alb }}
+        alb:
+          {{- toYaml $deployment.rollout.strategy.canary.trafficRouting.alb | nindent 10 }}
+        {{- else if $deployment.rollout.strategy.canary.trafficRouting.smi }}
+        smi:
+          {{- toYaml $deployment.rollout.strategy.canary.trafficRouting.smi | nindent 10 }}
+        {{- else if $deployment.rollout.strategy.canary.trafficRouting.ambassador }}
+        ambassador:
+          {{- toYaml $deployment.rollout.strategy.canary.trafficRouting.ambassador | nindent 10 }}
+        {{- else if $deployment.rollout.strategy.canary.trafficRouting.appMesh }}
+        appMesh:
+          {{- toYaml $deployment.rollout.strategy.canary.trafficRouting.appMesh | nindent 10 }}
+        {{- end }}
+      {{- end }}
+      {{- if $deployment.rollout.strategy.canary.scaleDownDelaySeconds }}
+      scaleDownDelaySeconds: {{ $deployment.rollout.strategy.canary.scaleDownDelaySeconds }}
+      {{- end }}
+      {{- if $deployment.rollout.strategy.canary.abortScaleDownDelaySeconds }}
+      abortScaleDownDelaySeconds: {{ $deployment.rollout.strategy.canary.abortScaleDownDelaySeconds }}
+      {{- end }}
+    {{- else if eq $deployment.rollout.strategy.type "blueGreen" }}
+    blueGreen:
+      {{- if $deployment.rollout.strategy.blueGreen.activeService }}
+      activeService: {{ $deployment.rollout.strategy.blueGreen.activeService }}
+      {{- end }}
+      {{- if $deployment.rollout.strategy.blueGreen.previewService }}
+      previewService: {{ $deployment.rollout.strategy.blueGreen.previewService }}
+      {{- end }}
+      {{- if $deployment.rollout.strategy.blueGreen.autoPromotionEnabled }}
+      autoPromotionEnabled: {{ $deployment.rollout.strategy.blueGreen.autoPromotionEnabled }}
+      {{- end }}
+      {{- if $deployment.rollout.strategy.blueGreen.scaleDownDelaySeconds }}
+      scaleDownDelaySeconds: {{ $deployment.rollout.strategy.blueGreen.scaleDownDelaySeconds }}
+      {{- end }}
+      {{- if $deployment.rollout.strategy.blueGreen.prePromotionAnalysis }}
+      prePromotionAnalysis:
+        {{- if $deployment.rollout.strategy.blueGreen.prePromotionAnalysis.templates }}
+        templates:
+          {{- range $deployment.rollout.strategy.blueGreen.prePromotionAnalysis.templates }}
+          - templateName: {{ .templateName }}
+            {{- if .clusterScope }}
+            clusterScope: {{ .clusterScope }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
+        {{- if $deployment.rollout.strategy.blueGreen.prePromotionAnalysis.args }}
+        args:
+          {{- range $deployment.rollout.strategy.blueGreen.prePromotionAnalysis.args }}
+          - name: {{ .name }}
+            {{- if .value }}
+            value: {{ .value | quote }}
+            {{- end }}
+            {{- if .valueFrom }}
+            valueFrom:
+              {{- toYaml .valueFrom | nindent 14 }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- if $deployment.rollout.strategy.blueGreen.postPromotionAnalysis }}
+      postPromotionAnalysis:
+        {{- if $deployment.rollout.strategy.blueGreen.postPromotionAnalysis.templates }}
+        templates:
+          {{- range $deployment.rollout.strategy.blueGreen.postPromotionAnalysis.templates }}
+          - templateName: {{ .templateName }}
+            {{- if .clusterScope }}
+            clusterScope: {{ .clusterScope }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
+        {{- if $deployment.rollout.strategy.blueGreen.postPromotionAnalysis.args }}
+        args:
+          {{- range $deployment.rollout.strategy.blueGreen.postPromotionAnalysis.args }}
+          - name: {{ .name }}
+            {{- if .value }}
+            value: {{ .value | quote }}
+            {{- end }}
+            {{- if .valueFrom }}
+            valueFrom:
+              {{- toYaml .valueFrom | nindent 14 }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- if $deployment.rollout.strategy.blueGreen.previewReplicaCount }}
+      previewReplicaCount: {{ $deployment.rollout.strategy.blueGreen.previewReplicaCount }}
+      {{- end }}
+      {{- if $deployment.rollout.strategy.blueGreen.antiAffinity }}
+      antiAffinity:
+        {{- toYaml $deployment.rollout.strategy.blueGreen.antiAffinity | nindent 8 }}
+      {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}
