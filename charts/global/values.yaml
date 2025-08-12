@@ -38,6 +38,23 @@ deployments: #{}
           targetPort: http
           protocol: TCP
       annotations: {}
+    ingress:
+      enabled: true
+      className: ""          # Ingress class (e.g., nginx, traefik)
+      annotations: {}
+        # kubernetes.io/ingress.class: nginx
+        # kubernetes.io/tls-acme: "true"
+        # nginx.ingress.kubernetes.io/rewrite-target: /
+      hosts:
+        - host: frontend.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+              servicePort: 80
+      tls: []
+        # - secretName: frontend-tls
+        #   hosts:
+        #     - frontend.example.com
     resources:
       limits:
         cpu: 500m
@@ -78,9 +95,55 @@ deployments: #{}
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9090"
+    ingress:
+      enabled: true
+      className: "nginx"
+      annotations:
+        nginx.ingress.kubernetes.io/rewrite-target: /
+        nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+      hosts:
+        - host: api.example.com
+          paths:
+            - path: /api
+              pathType: Prefix
+              servicePort: 8080
+        - host: backend.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+              servicePort: 8080
+      tls:
+        - secretName: backend-tls
+          hosts:
+            - api.example.com
+            - backend.example.com
     env:
       - name: DATABASE_URL
         value: "postgresql://..."
+
+# Global ingress configuration (optional)
+# This can route traffic to multiple services from a single ingress
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: myapp.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: frontend    # Reference to deployment name
+          servicePort: 80
+        - path: /api
+          pathType: Prefix
+          serviceName: backend     # Reference to deployment name
+          servicePort: 8080
+  tls: []
+    # - secretName: myapp-tls
+    #   hosts:
+    #     - myapp.example.com
 
 # Image pull secrets (applied to all deployments by default)
 imagePullSecrets: []
