@@ -1,0 +1,138 @@
+{{- range $name, $deployment := .Values.deployments }}
+{{- if and $deployment.cronJob $deployment.cronJob.enabled }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "global.fullname" $ }}-{{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "global.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $name }}
+  {{- with $deployment.cronJob.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  schedule: {{ $deployment.cronJob.schedule | quote }}
+  {{- if $deployment.cronJob.timeZone }}
+  timeZone: {{ $deployment.cronJob.timeZone | quote }}
+  {{- end }}
+  {{- if hasKey $deployment.cronJob "concurrencyPolicy" }}
+  concurrencyPolicy: {{ $deployment.cronJob.concurrencyPolicy }}
+  {{- else }}
+  concurrencyPolicy: Forbid
+  {{- end }}
+  {{- if hasKey $deployment.cronJob "suspend" }}
+  suspend: {{ $deployment.cronJob.suspend }}
+  {{- else }}
+  suspend: false
+  {{- end }}
+  {{- if $deployment.cronJob.successfulJobsHistoryLimit }}
+  successfulJobsHistoryLimit: {{ $deployment.cronJob.successfulJobsHistoryLimit }}
+  {{- else }}
+  successfulJobsHistoryLimit: 3
+  {{- end }}
+  {{- if $deployment.cronJob.failedJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ $deployment.cronJob.failedJobsHistoryLimit }}
+  {{- else }}
+  failedJobsHistoryLimit: 1
+  {{- end }}
+  {{- if $deployment.cronJob.startingDeadlineSeconds }}
+  startingDeadlineSeconds: {{ $deployment.cronJob.startingDeadlineSeconds }}
+  {{- end }}
+  jobTemplate:
+    metadata:
+      labels:
+        {{- include "global.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: {{ $name }}
+      {{- with $deployment.cronJob.jobAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- if $deployment.cronJob.activeDeadlineSeconds }}
+      activeDeadlineSeconds: {{ $deployment.cronJob.activeDeadlineSeconds }}
+      {{- end }}
+      {{- if $deployment.cronJob.backoffLimit }}
+      backoffLimit: {{ $deployment.cronJob.backoffLimit }}
+      {{- else }}
+      backoffLimit: 6
+      {{- end }}
+      {{- if $deployment.cronJob.completions }}
+      completions: {{ $deployment.cronJob.completions }}
+      {{- end }}
+      {{- if $deployment.cronJob.parallelism }}
+      parallelism: {{ $deployment.cronJob.parallelism }}
+      {{- end }}
+      {{- if $deployment.cronJob.ttlSecondsAfterFinished }}
+      ttlSecondsAfterFinished: {{ $deployment.cronJob.ttlSecondsAfterFinished }}
+      {{- end }}
+      template:
+        metadata:
+          {{- with (merge ($deployment.cronJob.podAnnotations | default dict) ($.Values.podAnnotations | default dict)) }}
+          annotations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          labels:
+            {{- include "global.selectorLabels" $ | nindent 12 }}
+            app.kubernetes.io/component: {{ $name }}
+        spec:
+          {{- with (coalesce $deployment.imagePullSecrets $.Values.imagePullSecrets) }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          serviceAccountName: {{ ($deployment.serviceAccount | default dict).name | default (include "global.serviceAccountName" $) }}
+          securityContext:
+            {{- toYaml (coalesce $deployment.podSecurityContext $.Values.securityContext) | nindent 12 }}
+          {{- if $deployment.cronJob.restartPolicy }}
+          restartPolicy: {{ $deployment.cronJob.restartPolicy }}
+          {{- else }}
+          restartPolicy: OnFailure
+          {{- end }}
+          containers:
+            - name: {{ $name }}
+              securityContext:
+                {{- toYaml (coalesce $deployment.securityContext $.Values.containerSecurityContext) | nindent 16 }}
+              image: "{{ $deployment.image.repository }}:{{ $deployment.image.tag | default $.Chart.AppVersion }}"
+              imagePullPolicy: {{ $deployment.image.pullPolicy | default "IfNotPresent" }}
+              {{- if $deployment.cronJob.command }}
+              command:
+                {{- toYaml $deployment.cronJob.command | nindent 16 }}
+              {{- end }}
+              {{- if $deployment.cronJob.args }}
+              args:
+                {{- toYaml $deployment.cronJob.args | nindent 16 }}
+              {{- end }}
+              {{- if $deployment.env }}
+              env:
+                {{- toYaml $deployment.env | nindent 16 }}
+              {{- end }}
+              {{- if $deployment.envFrom }}
+              envFrom:
+                {{- toYaml $deployment.envFrom | nindent 16 }}
+              {{- end }}
+              resources:
+                {{- toYaml (coalesce $deployment.resources $.Values.resources) | nindent 16 }}
+              {{- if $deployment.volumeMounts }}
+              volumeMounts:
+                {{- toYaml $deployment.volumeMounts | nindent 16 }}
+              {{- end }}
+          {{- if $deployment.volumes }}
+          volumes:
+            {{- toYaml $deployment.volumes | nindent 12 }}
+          {{- end }}
+          {{- with (coalesce $deployment.nodeSelector $.Values.nodeSelector) }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with (coalesce $deployment.affinity $.Values.affinity) }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with (coalesce $deployment.tolerations $.Values.tolerations) }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}
+{{- end }}

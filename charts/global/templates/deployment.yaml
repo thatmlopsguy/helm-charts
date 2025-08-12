@@ -2,7 +2,7 @@
 Support for multiple deployments - iterate over deployments map
 */}}
 {{- range $deploymentName, $deployment := .Values.deployments }}
-{{- if and (kindOf $deployment | eq "map") ($deployment.enabled) (not (and $deployment.job $deployment.job.enabled)) }}
+{{- if and (kindOf $deployment | eq "map") ($deployment.enabled) (not (and $deployment.job $deployment.job.enabled)) (not (and $deployment.cronJob $deployment.cronJob.enabled)) }}
 ---
 apiVersion: apps/v1
 kind: Deployment
