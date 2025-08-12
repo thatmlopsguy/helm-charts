@@ -15,7 +15,7 @@ namespace: ""
 # Multiple deployments configuration
 # This allows deploying multiple applications from a single chart
 # Each deployment MUST have its own image configuration
-deployments: #{}
+deployments: # {}
   # Example configuration:
   frontend:
     enabled: true
@@ -23,7 +23,7 @@ deployments: #{}
     image:
       registry: ""           # Optional: container registry
       repository: nginx      # Required: image repository
-      tag: "1.21.6"         # Required: image tag
+      tag: "1.21.6"          # Required: image tag
       pullPolicy: IfNotPresent
     ports:
       - name: http
@@ -195,6 +195,95 @@ deployments: #{}
   #     - name: DATABASE_URL
   #       value: "postgresql://..."
 
+  # Example CronJob configuration:
+  # backup:
+  #   enabled: true
+  #   image:
+  #     repository: myapp/backup
+  #     tag: "v1.0.0"
+  #   cronJob:
+  #     enabled: true
+  #     schedule: "0 2 * * *"          # Daily at 2 AM
+  #     timeZone: "UTC"                # Optional timezone
+  #     concurrencyPolicy: Forbid      # Forbid, Allow, Replace
+  #     suspend: false                 # Suspend cron job execution
+  #     successfulJobsHistoryLimit: 3  # Keep last 3 successful jobs
+  #     failedJobsHistoryLimit: 1      # Keep last 1 failed job
+  #     startingDeadlineSeconds: 200   # Deadline for starting the job if missed
+  #     activeDeadlineSeconds: 3600    # Maximum duration for job execution (1 hour)
+  #     backoffLimit: 3                # Number of retries before marking job as failed
+  #     ttlSecondsAfterFinished: 86400 # Clean up job after 24 hours
+  #     restartPolicy: OnFailure       # Never, OnFailure
+  #     command: ["sh", "-c"]
+  #     args: ["pg_dump $DATABASE_URL > /backup/db-$(date +%Y%m%d-%H%M%S).sql"]
+  #     annotations:
+  #       backup.kubernetes.io/schedule: "daily"
+  #     jobAnnotations:
+  #       backup.kubernetes.io/type: "database"
+  #     podAnnotations:
+  #       backup.kubernetes.io/retention: "30d"
+  #   env:
+  #     - name: DATABASE_URL
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: database-secret
+  #           key: url
+  #     - name: BACKUP_RETENTION_DAYS
+  #       value: "30"
+
+  # Example ExternalSecret configuration:
+  # app-secrets:
+  #   enabled: true
+  #   image:
+  #     repository: myapp/api
+  #     tag: "v1.0.0"
+  #   externalSecret:
+  #     enabled: true
+  #     refreshInterval: "15m"
+  #     secretStoreRef:
+  #       name: aws-secrets-store
+  #       kind: SecretStore
+  #     target:
+  #       name: app-secrets
+  #       creationPolicy: Owner
+  #       template:
+  #         type: Opaque
+  #         metadata:
+  #           labels:
+  #             app.kubernetes.io/name: app-secrets
+  #         data:
+  #           DATABASE_URL: "postgresql://{{ .username }}:{{ .password }}@{{ .host }}:{{ .port }}/{{ .database }}"
+  #           REDIS_URL: "redis://{{ .redis_host }}:{{ .redis_port }}"
+  #     data:
+  #       - secretKey: username
+  #         remoteRef:
+  #           key: myapp/database
+  #           property: username
+  #       - secretKey: password
+  #         remoteRef:
+  #           key: myapp/database
+  #           property: password
+  #       - secretKey: host
+  #         remoteRef:
+  #           key: myapp/database
+  #           property: host
+  #       - secretKey: port
+  #         remoteRef:
+  #           key: myapp/database
+  #           property: port
+  #       - secretKey: database
+  #         remoteRef:
+  #           key: myapp/database
+  #           property: database
+  #       - secretKey: redis_host
+  #         remoteRef:
+  #           key: myapp/redis
+  #           property: host
+  #       - secretKey: redis_port
+  #         remoteRef:
+  #           key: myapp/redis
+  #           property: port
+
 # Global ingress configuration (optional)
 # This can route traffic to multiple services from a single ingress
 ingress:
@@ -308,3 +397,53 @@ configMaps:
     #       log4j.rootLogger=INFO, stdout
     #       log4j.appender.stdout=org.apache.log4j.ConsoleAppender
     #       log4j.appender.stdout.layout=org.apache.log4j.PatternLayout
+
+# Global ExternalSecrets (shared across all deployments)
+externalSecrets:
+  enabled: false
+  secrets: {}
+    # Example global ExternalSecrets:
+    # database-credentials:
+    #   refreshInterval: "1h"
+    #   secretStoreRef:
+    #     name: vault-backend
+    #     kind: SecretStore
+    #   target:
+    #     name: database-credentials
+    #     creationPolicy: Owner
+    #     template:
+    #       type: Opaque
+    #       data:
+    #         DATABASE_URL: "postgresql://{{ .username }}:{{ .password }}@{{ .host }}:5432/{{ .database }}"
+    #   data:
+    #     - secretKey: username
+    #       remoteRef:
+    #         key: secret/database
+    #         property: username
+    #     - secretKey: password
+    #       remoteRef:
+    #         key: secret/database
+    #         property: password
+    #     - secretKey: host
+    #       remoteRef:
+    #         key: secret/database
+    #         property: host
+    #     - secretKey: database
+    #       remoteRef:
+    #         key: secret/database
+    #         property: database
+    # api-keys:
+    #   refreshInterval: "30m"
+    #   secretStoreRef:
+    #     name: aws-secrets-manager
+    #     kind: ClusterSecretStore
+    #   target:
+    #     name: api-keys
+    #     creationPolicy: Owner
+    #   dataFrom:
+    #     - extract:
+    #         key: myapp/api-keys
+    #       rewrite:
+    #         - regexp:
+    #             source: "(.*)_key$"
+    #             target: "$1_API_KEY"
