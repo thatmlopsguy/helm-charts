@@ -121,6 +121,26 @@ deployments: #{}
       - name: DATABASE_URL
         value: "postgresql://..."
 
+  # Example job configuration:
+  # migration:
+  #   enabled: true
+  #   image:
+  #     repository: myapp/migration
+  #     tag: "v1.0.0"
+  #   job:
+  #     enabled: true
+  #     restartPolicy: Never        # Never, OnFailure
+  #     backoffLimit: 3             # Number of retries before marking job as failed
+  #     activeDeadlineSeconds: 600  # Maximum duration for job execution
+  #     ttlSecondsAfterFinished: 86400  # Clean up job after 24 hours
+  #     command: ["python", "manage.py", "migrate"]
+  #     annotations:
+  #       helm.sh/hook: pre-install,pre-upgrade
+  #       helm.sh/hook-weight: "1"
+  #   env:
+  #     - name: DATABASE_URL
+  #       value: "postgresql://..."
+
 # Global ingress configuration (optional)
 # This can route traffic to multiple services from a single ingress
 ingress:

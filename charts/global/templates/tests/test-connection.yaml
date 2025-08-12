@@ -1,9 +1,20 @@
+{{- $hasServices := false }}
+{{- range $name, $deployment := .Values.deployments }}
+  {{- if and $deployment.service $deployment.service.enabled }}
+    {{- $hasServices = true }}
+  {{- end }}
+{{- end }}
+{{- if $hasServices }}
+{{- range $name, $deployment := .Values.deployments }}
+{{- if and $deployment.service $deployment.service.enabled }}
+---
 apiVersion: v1
 kind: Pod
 metadata:
-  name: "{{ include "global.fullname" . }}-test-connection"
+  name: "{{ include "global.fullname" $ }}-{{ $name }}-test-connection"
   labels:
-    {{- include "global.labels" . | nindent 4 }}
+    {{- include "global.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $name }}
   annotations:
     "helm.sh/hook": test
 spec:
@@ -11,5 +22,8 @@ spec:
     - name: wget
       image: busybox
       command: ['wget']
-      args: ['{{ include "global.fullname" . }}:{{ .Values.service.port }}']
+      args: ['{{ include "global.fullname" $ }}-{{ $name }}:{{ (index $deployment.service.ports 0).port }}']
   restartPolicy: Never
+{{- end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,101 @@
+{{- range $name, $job := .Values.deployments }}
+{{- if and $job.job $job.job.enabled }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "global.fullname" $ }}-{{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "global.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $name }}
+  {{- with $job.job.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if $job.job.ttlSecondsAfterFinished }}
+  ttlSecondsAfterFinished: {{ $job.job.ttlSecondsAfterFinished }}
+  {{- end }}
+  {{- if $job.job.activeDeadlineSeconds }}
+  activeDeadlineSeconds: {{ $job.job.activeDeadlineSeconds }}
+  {{- end }}
+  {{- if $job.job.backoffLimit }}
+  backoffLimit: {{ $job.job.backoffLimit }}
+  {{- else }}
+  backoffLimit: 6
+  {{- end }}
+  {{- if $job.job.completions }}
+  completions: {{ $job.job.completions }}
+  {{- end }}
+  {{- if $job.job.parallelism }}
+  parallelism: {{ $job.job.parallelism }}
+  {{- end }}
+  template:
+    metadata:
+      {{- with (merge ($job.job.podAnnotations | default dict) ($.Values.podAnnotations | default dict)) }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "global.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: {{ $name }}
+    spec:
+      {{- with (coalesce $job.imagePullSecrets $.Values.imagePullSecrets) }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ ($job.serviceAccount | default dict).name | default (include "global.serviceAccountName" $) }}
+      securityContext:
+        {{- toYaml (coalesce $job.podSecurityContext $.Values.securityContext) | nindent 8 }}
+      {{- if $job.job.restartPolicy }}
+      restartPolicy: {{ $job.job.restartPolicy }}
+      {{- else }}
+      restartPolicy: OnFailure
+      {{- end }}
+      containers:
+        - name: {{ $name }}
+          securityContext:
+            {{- toYaml (coalesce $job.securityContext $.Values.containerSecurityContext) | nindent 12 }}
+          image: "{{ $job.image.repository }}:{{ $job.image.tag | default $.Chart.AppVersion }}"
+          imagePullPolicy: {{ $job.image.pullPolicy | default "IfNotPresent" }}
+          {{- if $job.job.command }}
+          command:
+            {{- toYaml $job.job.command | nindent 12 }}
+          {{- end }}
+          {{- if $job.job.args }}
+          args:
+            {{- toYaml $job.job.args | nindent 12 }}
+          {{- end }}
+          {{- if $job.env }}
+          env:
+            {{- toYaml $job.env | nindent 12 }}
+          {{- end }}
+          {{- if $job.envFrom }}
+          envFrom:
+            {{- toYaml $job.envFrom | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml (coalesce $job.resources $.Values.resources) | nindent 12 }}
+          {{- if $job.volumeMounts }}
+          volumeMounts:
+            {{- toYaml $job.volumeMounts | nindent 12 }}
+          {{- end }}
+      {{- if $job.volumes }}
+      volumes:
+        {{- toYaml $job.volumes | nindent 8 }}
+      {{- end }}
+      {{- with (coalesce $job.nodeSelector $.Values.nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (coalesce $job.affinity $.Values.affinity) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (coalesce $job.tolerations $.Values.tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
+{{- end }}
