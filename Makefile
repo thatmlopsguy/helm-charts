@@ -4,4 +4,4 @@ help:
 
 .PHONY: pre-commit
 pre-commit: ## Run pre-commit run -a
-	pre-commit run -a
+	uvx prek run -a

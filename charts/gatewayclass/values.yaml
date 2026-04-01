@@ -1,0 +1,7 @@
+gatewayClasses:
+  - name: cluster-gateway
+    controllerName: example.net/gateway-controller
+  - name: regional-gateway
+    controllerName: example.net/region-gateway-controller
+  - name: private-gateway
+    controllerName: example.net/private-controller

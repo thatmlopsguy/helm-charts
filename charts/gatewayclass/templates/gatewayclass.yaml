@@ -1,0 +1,11 @@
+{{- if .Values.gatewayClasses }}
+{{- range $index, $gc := .Values.gatewayClasses }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: {{ $gc.name }}
+spec:
+  controllerName: "{{ $gc.controllerName }}"
+---
+{{- end }}
+{{- end }}
