@@ -1,0 +1,22 @@
+# Test configuration for cert-manager Certificates
+# This file tests the certificate template with minimal configuration
+
+deployments:
+  test-cert-app:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: nginx
+      tag: "1.21.6"
+      pullPolicy: IfNotPresent
+    ports:
+      - name: https
+        containerPort: 443
+        protocol: TCP
+    certificate:
+      enabled: true
+      issuerRef:
+        name: test-issuer
+        kind: ClusterIssuer
+      dnsNames:
+        - test-app.example.com

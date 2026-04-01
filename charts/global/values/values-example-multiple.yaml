@@ -1,0 +1,1089 @@
+# Example values file demonstrating multiple deployments
+# Save this as values-example.yaml and use with:
+# helm install my-release ./charts/global -f values-example.yaml
+
+nameOverride: "multi-app"
+namespace: "my-namespace"
+
+# Common image pull secrets for all deployments
+imagePullSecrets:
+  - name: my-registry-secret
+
+# Multiple deployments configuration
+deployments:
+  # Frontend application
+  frontend:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: nginx
+      tag: "1.21.6"
+      pullPolicy: IfNotPresent
+    ports:
+      - name: http
+        containerPort: 80
+        protocol: TCP
+    service:
+      enabled: true
+      type: ClusterIP
+      ports:
+        - name: http
+          port: 80
+          targetPort: http
+          protocol: TCP
+      annotations:
+        nginx.ingress.kubernetes.io/rewrite-target: /
+    ingress:
+      enabled: true
+      className: "nginx"
+      annotations:
+        kubernetes.io/tls-acme: "true"
+        nginx.ingress.kubernetes.io/ssl-redirect: "true"
+        nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      hosts:
+        - host: frontend.myapp.com
+          paths:
+            - path: /
+              pathType: Prefix
+              servicePort: 80
+      tls:
+        - secretName: frontend-tls
+          hosts:
+            - frontend.myapp.com
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+    livenessProbe:
+      httpGet:
+        path: /
+        port: http
+      initialDelaySeconds: 30
+      periodSeconds: 10
+    readinessProbe:
+      httpGet:
+        path: /
+        port: http
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    strategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxSurge: 1
+        maxUnavailable: 0
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+    podAnnotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "80"
+    # ConfigMap for frontend nginx configuration
+    configMap:
+      enabled: true
+      annotations:
+        config.kubernetes.io/source: "frontend-nginx-config"
+      data:
+        nginx.conf: |
+          user nginx;
+          worker_processes auto;
+          error_log /var/log/nginx/error.log notice;
+          pid /var/run/nginx.pid;
+
+          events {
+              worker_connections 1024;
+          }
+
+          http {
+              include /etc/nginx/mime.types;
+              default_type application/octet-stream;
+
+              log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                             '$status $body_bytes_sent "$http_referer" '
+                             '"$http_user_agent" "$http_x_forwarded_for"';
+
+              access_log /var/log/nginx/access.log main;
+
+              sendfile on;
+              tcp_nopush on;
+              keepalive_timeout 65;
+              gzip on;
+              gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+
+              server {
+                  listen 80;
+                  server_name _;
+                  root /usr/share/nginx/html;
+                  index index.html;
+
+                  # Frontend routes
+                  location / {
+                      try_files $uri $uri/ /index.html;
+                  }
+
+                  # API proxy
+                  location /api/ {
+                      proxy_pass http://backend:8080/;
+                      proxy_set_header Host $host;
+                      proxy_set_header X-Real-IP $remote_addr;
+                      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                      proxy_set_header X-Forwarded-Proto $scheme;
+                  }
+
+                  # Health check
+                  location /health {
+                      access_log off;
+                      return 200 "healthy\n";
+                      add_header Content-Type text/plain;
+                  }
+              }
+          }
+        app-config.js: |
+          window.APP_CONFIG = {
+            API_BASE_URL: '/api',
+            ENVIRONMENT: 'production',
+            FEATURES: {
+              AUTH: true,
+              ANALYTICS: true,
+              NOTIFICATIONS: true
+            },
+            THEME: {
+              PRIMARY_COLOR: '#007bff',
+              SECONDARY_COLOR: '#6c757d'
+            }
+          };
+    # ExternalSecret for frontend API keys and configuration
+    externalSecret:
+      enabled: true
+      refreshInterval: "30m"
+      secretStoreRef:
+        name: aws-secrets-manager
+        kind: ClusterSecretStore
+      target:
+        name: frontend-secrets
+        creationPolicy: Owner
+        template:
+          type: Opaque
+          metadata:
+            labels:
+              app.kubernetes.io/component: frontend
+              secrets.kubernetes.io/type: api-keys
+          data:
+            ANALYTICS_API_KEY: "{{ .analytics_key }}"
+            MAPS_API_KEY: "{{ .maps_key }}"
+            PAYMENT_PUBLISHABLE_KEY: "{{ .payment_key }}"
+            OAUTH_CLIENT_ID: "{{ .oauth_client_id }}"
+            CDN_ACCESS_TOKEN: "{{ .cdn_token }}"
+      data:
+        - secretKey: analytics_key
+          remoteRef:
+            key: myapp/frontend/analytics
+            property: api_key
+        - secretKey: maps_key
+          remoteRef:
+            key: myapp/frontend/maps
+            property: api_key
+        - secretKey: payment_key
+          remoteRef:
+            key: myapp/frontend/payment
+            property: publishable_key
+        - secretKey: oauth_client_id
+          remoteRef:
+            key: myapp/frontend/oauth
+            property: client_id
+        - secretKey: cdn_token
+          remoteRef:
+            key: myapp/frontend/cdn
+            property: access_token
+      annotations:
+        external-secrets.io/backend: "aws"
+        external-secrets.io/region: "us-east-1"
+    # Simple HPA configuration for frontend
+    autoscaling:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 8
+      targetCPUUtilizationPercentage: 60
+      # Simple scaling behavior - faster scale up, slower scale down
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 180  # Wait 3 minutes before scaling down
+        scaleUp:
+          stabilizationWindowSeconds: 30   # Quick scale up for frontend responsiveness
+
+  # Backend API application
+  backend:
+    enabled: true
+    replicaCount: 3
+    image:
+      repository: my-app/backend
+      tag: "v1.0.0"
+      pullPolicy: IfNotPresent
+    ports:
+      - name: api
+        containerPort: 8080
+        protocol: TCP
+      - name: metrics
+        containerPort: 9090
+        protocol: TCP
+    service:
+      enabled: true
+      type: ClusterIP
+      ports:
+        - name: api
+          port: 8080
+          targetPort: api
+          protocol: TCP
+        - name: metrics
+          port: 9090
+          targetPort: metrics
+          protocol: TCP
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    ingress:
+      enabled: true
+      className: "nginx"
+      annotations:
+        nginx.ingress.kubernetes.io/rewrite-target: /$1
+        nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+        nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+        nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+      hosts:
+        - host: api.myapp.com
+          paths:
+            - path: /api/(.*)
+              pathType: ImplementationSpecific
+              servicePort: 8080
+        - host: backend.myapp.com
+          paths:
+            - path: /
+              pathType: Prefix
+              servicePort: 8080
+            - path: /metrics
+              pathType: Prefix
+              servicePort: 9090
+      tls:
+        - secretName: backend-tls
+          hosts:
+            - api.myapp.com
+            - backend.myapp.com
+    # ExternalSecret for backend sensitive configuration
+    externalSecret:
+      enabled: true
+      refreshInterval: "15m"
+      secretStoreRef:
+        name: vault-backend
+        kind: SecretStore
+      target:
+        name: backend-secrets
+        creationPolicy: Owner
+        template:
+          type: Opaque
+          metadata:
+            labels:
+              app.kubernetes.io/component: backend
+              secrets.kubernetes.io/type: database
+          data:
+            DATABASE_URL: "postgresql://{{ .db_username }}:{{ .db_password }}@{{ .db_host }}:{{ .db_port }}/{{ .db_name }}?sslmode=require"
+            REDIS_URL: "redis://{{ .redis_password }}@{{ .redis_host }}:{{ .redis_port }}/0"
+            JWT_SECRET: "{{ .jwt_secret }}"
+            API_KEY: "{{ .api_key }}"
+            ENCRYPTION_KEY: "{{ .encryption_key }}"
+      data:
+        - secretKey: db_username
+          remoteRef:
+            key: secret/myapp/database
+            property: username
+        - secretKey: db_password
+          remoteRef:
+            key: secret/myapp/database
+            property: password
+        - secretKey: db_host
+          remoteRef:
+            key: secret/myapp/database
+            property: host
+        - secretKey: db_port
+          remoteRef:
+            key: secret/myapp/database
+            property: port
+        - secretKey: db_name
+          remoteRef:
+            key: secret/myapp/database
+            property: database
+        - secretKey: redis_host
+          remoteRef:
+            key: secret/myapp/redis
+            property: host
+        - secretKey: redis_port
+          remoteRef:
+            key: secret/myapp/redis
+            property: port
+        - secretKey: redis_password
+          remoteRef:
+            key: secret/myapp/redis
+            property: password
+        - secretKey: jwt_secret
+          remoteRef:
+            key: secret/myapp/jwt
+            property: secret
+        - secretKey: api_key
+          remoteRef:
+            key: secret/myapp/external-apis
+            property: third_party_api_key
+        - secretKey: encryption_key
+          remoteRef:
+            key: secret/myapp/encryption
+            property: master_key
+      annotations:
+        external-secrets.io/backend: "vault"
+        external-secrets.io/refresh-strategy: "polling"
+    env:
+      - name: DATABASE_URL
+        value: "postgresql://db:5432/myapp"
+      - name: REDIS_URL
+        value: "redis://redis:6379"
+      - name: LOG_LEVEL
+        value: "info"
+    envFrom:
+      - configMapRef:
+          name: backend-config
+      - secretRef:
+          name: backend-secrets
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+    livenessProbe:
+      httpGet:
+        path: /health
+        port: api
+      initialDelaySeconds: 60
+      periodSeconds: 30
+    readinessProbe:
+      httpGet:
+        path: /ready
+        port: api
+      initialDelaySeconds: 10
+      periodSeconds: 5
+    startupProbe:
+      httpGet:
+        path: /startup
+        port: api
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      failureThreshold: 30
+    # ConfigMap for backend application configuration
+    configMap:
+      enabled: true
+      annotations:
+        config.kubernetes.io/source: "backend-application-config"
+        app.kubernetes.io/managed-by: "helm"
+      data:
+        application.yml: |
+          server:
+            port: 8080
+            shutdown: graceful
+          spring:
+            datasource:
+              url: ${DATABASE_URL}
+              driver-class-name: org.postgresql.Driver
+              hikari:
+                maximum-pool-size: 20
+                minimum-idle: 5
+            redis:
+              url: ${REDIS_URL}
+              timeout: 2000ms
+            jpa:
+              hibernate:
+                ddl-auto: validate
+              show-sql: false
+          logging:
+            level:
+              com.myapp: ${LOG_LEVEL:info}
+              org.springframework.web: info
+              org.hibernate.SQL: debug
+          management:
+            endpoints:
+              web:
+                exposure:
+                  include: health,info,metrics,prometheus
+            endpoint:
+              health:
+                show-details: always
+        logback.xml: |
+          <configuration>
+            <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+              <encoder>
+                <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+              </encoder>
+            </appender>
+            <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+              <file>/app/logs/application.log</file>
+              <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                <fileNamePattern>/app/logs/application.%d{yyyy-MM-dd}.%i.gz</fileNamePattern>
+                <maxFileSize>100MB</maxFileSize>
+                <maxHistory>30</maxHistory>
+              </rollingPolicy>
+              <encoder>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+              </encoder>
+            </appender>
+            <root level="INFO">
+              <appender-ref ref="STDOUT" />
+              <appender-ref ref="FILE" />
+            </root>
+          </configuration>
+        cors.properties: |
+          # CORS configuration
+          cors.allowed.origins=https://frontend.myapp.com,https://admin.myapp.com
+          cors.allowed.methods=GET,POST,PUT,DELETE,OPTIONS
+          cors.allowed.headers=*
+          cors.allow.credentials=true
+          cors.max.age=3600
+    volumeMounts:
+      - name: config-volume
+        mountPath: /app/config
+        readOnly: true
+    volumes:
+      - name: config-volume
+        configMap:
+          name: backend-config-files
+    nodeSelector:
+      disktype: ssd
+    tolerations:
+      - key: "backend-only"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+    # Advanced HPA configuration with custom metrics and scaling behavior
+    autoscaling:
+      enabled: true
+      minReplicas: 3
+      maxReplicas: 20
+      targetCPUUtilizationPercentage: 70
+      targetMemoryUtilizationPercentage: 80
+      # Custom scaling behavior for more controlled scaling
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 300  # Wait 5 minutes before scaling down
+          policies:
+          - type: Percent
+            value: 10         # Scale down by max 10% at a time
+            periodSeconds: 60
+          - type: Pods
+            value: 2          # Or max 2 pods at a time
+            periodSeconds: 60
+          selectPolicy: Min   # Use the more conservative policy
+        scaleUp:
+          stabilizationWindowSeconds: 60   # Wait 1 minute before scaling up
+          policies:
+          - type: Percent
+            value: 50         # Scale up by max 50% at a time
+            periodSeconds: 60
+          - type: Pods
+            value: 4          # Or max 4 pods at a time
+            periodSeconds: 60
+          selectPolicy: Max   # Use the more aggressive policy
+      # Custom metrics (example - requires Prometheus adapter)
+      metrics:
+        - type: Pods
+          pods:
+            metric:
+              name: http_requests_per_second
+            target:
+              type: AverageValue
+              averageValue: "100"
+        - type: Object
+          object:
+            metric:
+              name: queue_length
+            describedObject:
+              apiVersion: v1
+              kind: Service
+              name: message-queue
+            target:
+              type: Value
+              value: "50"
+      annotations:
+        # Annotations for monitoring and alerting
+        monitoring.company.com/alert-on-scale: "true"
+        monitoring.company.com/max-scale-threshold: "15"
+
+  # Worker application
+  worker:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: my-app/worker
+      tag: "v1.0.0"
+      pullPolicy: IfNotPresent
+    command:
+      - "/app/worker"
+    args:
+      - "--queue=default"
+      - "--concurrency=4"
+    env:
+      - name: QUEUE_URL
+        value: "redis://redis:6379"
+      - name: DATABASE_URL
+        value: "postgresql://db:5432/myapp"
+    resources:
+      limits:
+        cpu: 500m
+        memory: 1Gi
+      requests:
+        cpu: 250m
+        memory: 512Mi
+    # No health checks for worker as it doesn't expose HTTP endpoints
+    autoscaling:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 10
+      targetCPUUtilizationPercentage: 70
+
+  # Database migration job
+  migration:
+    enabled: true
+    image:
+      repository: my-app/migration
+      tag: "v1.0.0"
+      pullPolicy: IfNotPresent
+    job:
+      enabled: true
+      restartPolicy: Never        # Never, OnFailure
+      backoffLimit: 3             # Number of retries before marking job as failed
+      activeDeadlineSeconds: 600  # Maximum duration for job execution (10 minutes)
+      ttlSecondsAfterFinished: 86400  # Clean up job after 24 hours
+      completions: 1              # Number of successful completions required
+      parallelism: 1              # Number of pods running in parallel
+      command: ["python"]
+      args: ["manage.py", "migrate", "--no-input"]
+      annotations:
+        # Helm hooks to run migrations before deployment
+        helm.sh/hook: pre-install,pre-upgrade
+        helm.sh/hook-weight: "1"
+        helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+      podAnnotations:
+        sidecar.istio.io/inject: "false"  # Don't inject service mesh for jobs
+    env:
+      - name: DATABASE_URL
+        valueFrom:
+          secretKeyRef:
+            name: database-secret
+            key: url
+      - name: MIGRATE_MODE
+        value: "true"
+      - name: LOG_LEVEL
+        value: "INFO"
+    envFrom:
+      - configMapRef:
+          name: migration-config
+    resources:
+      limits:
+        cpu: 500m
+        memory: 1Gi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+    volumeMounts:
+      - name: migration-scripts
+        mountPath: /app/migrations
+        readOnly: true
+    volumes:
+      - name: migration-scripts
+        configMap:
+          name: migration-scripts
+    nodeSelector:
+      workload-type: batch
+    tolerations:
+      - key: "batch-workload"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+    serviceAccount:
+      create: true
+      name: migration-service-account
+      annotations:
+        eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/migration-role
+
+  # Data seeding job
+  seeder:
+    enabled: false  # Only enable when needed
+    image:
+      repository: my-app/seeder
+      tag: "v1.0.0"
+    job:
+      enabled: true
+      restartPolicy: OnFailure
+      backoffLimit: 1
+      activeDeadlineSeconds: 1800  # 30 minutes
+      ttlSecondsAfterFinished: 3600  # Clean up after 1 hour
+      command: ["npm", "run", "seed"]
+      annotations:
+        helm.sh/hook: post-install
+        helm.sh/hook-weight: "5"
+    env:
+      - name: SEED_ENV
+        value: "production"
+    resources:
+      limits:
+        cpu: 200m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+
+  # Database backup CronJob
+  db-backup:
+    enabled: true
+    image:
+      repository: postgres
+      tag: "15-alpine"
+      pullPolicy: IfNotPresent
+    cronJob:
+      enabled: true
+      schedule: "0 2 * * *"             # Daily at 2 AM UTC
+      timeZone: "UTC"
+      concurrencyPolicy: Forbid          # Don't allow overlapping backups
+      suspend: false
+      successfulJobsHistoryLimit: 7     # Keep last week of successful backups
+      failedJobsHistoryLimit: 3         # Keep last 3 failed attempts
+      startingDeadlineSeconds: 300      # 5 minutes deadline to start
+      activeDeadlineSeconds: 1800       # 30 minutes max execution time
+      backoffLimit: 2                   # Retry twice on failure
+      ttlSecondsAfterFinished: 86400    # Clean up after 24 hours
+      restartPolicy: OnFailure
+      command: ["sh", "-c"]
+      args:
+        - |
+          echo "Starting database backup at $(date)"
+          pg_dump $DATABASE_URL | gzip > /backup/db-backup-$(date +%Y%m%d-%H%M%S).sql.gz
+          echo "Backup completed successfully"
+
+          # Clean up old backups (keep only last 30 days)
+          find /backup -name "db-backup-*.sql.gz" -mtime +30 -delete
+          echo "Old backups cleaned up"
+      annotations:
+        backup.kubernetes.io/type: "database"
+        backup.kubernetes.io/schedule: "daily"
+      jobAnnotations:
+        backup.kubernetes.io/retention: "30d"
+      podAnnotations:
+        backup.kubernetes.io/component: "postgresql"
+    env:
+      - name: DATABASE_URL
+        valueFrom:
+          secretKeyRef:
+            name: database-secret
+            key: connection-string
+      - name: PGPASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: database-secret
+            key: password
+    volumeMounts:
+      - name: backup-storage
+        mountPath: /backup
+    volumes:
+      - name: backup-storage
+        persistentVolumeClaim:
+          claimName: backup-pvc
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    nodeSelector:
+      workload-type: backup
+
+  # Log cleanup CronJob
+  log-cleanup:
+    enabled: true
+    image:
+      repository: busybox
+      tag: "1.36"
+    cronJob:
+      enabled: true
+      schedule: "0 3 * * 0"             # Weekly on Sunday at 3 AM
+      timeZone: "UTC"
+      concurrencyPolicy: Forbid
+      suspend: false
+      successfulJobsHistoryLimit: 4     # Keep last month of runs
+      failedJobsHistoryLimit: 2
+      startingDeadlineSeconds: 600      # 10 minutes deadline
+      activeDeadlineSeconds: 900        # 15 minutes max execution
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 604800   # Clean up after 1 week
+      restartPolicy: OnFailure
+      command: ["sh", "-c"]
+      args:
+        - |
+          echo "Starting log cleanup at $(date)"
+
+          # Clean up application logs older than 7 days
+          find /app/logs -name "*.log" -mtime +7 -delete
+          find /app/logs -name "*.log.gz" -mtime +30 -delete
+
+          # Clean up nginx access logs older than 14 days
+          find /var/log/nginx -name "access.log.*" -mtime +14 -delete
+
+          # Clean up error logs older than 90 days
+          find /var/log -name "error.log.*" -mtime +90 -delete
+
+          echo "Log cleanup completed at $(date)"
+      annotations:
+        cleanup.kubernetes.io/type: "logs"
+        cleanup.kubernetes.io/schedule: "weekly"
+    volumeMounts:
+      - name: app-logs
+        mountPath: /app/logs
+      - name: nginx-logs
+        mountPath: /var/log/nginx
+      - name: system-logs
+        mountPath: /var/log
+    volumes:
+      - name: app-logs
+        hostPath:
+          path: /var/log/myapp
+          type: DirectoryOrCreate
+      - name: nginx-logs
+        hostPath:
+          path: /var/log/nginx
+          type: DirectoryOrCreate
+      - name: system-logs
+        hostPath:
+          path: /var/log
+          type: Directory
+    resources:
+      limits:
+        cpu: 100m
+        memory: 64Mi
+      requests:
+        cpu: 50m
+        memory: 32Mi
+
+  # Health check CronJob
+  health-monitor:
+    enabled: true
+    image:
+      repository: curlimages/curl
+      tag: "8.4.0"
+    cronJob:
+      enabled: true
+      schedule: "*/5 * * * *"           # Every 5 minutes
+      timeZone: "UTC"
+      concurrencyPolicy: Allow          # Allow multiple health checks
+      suspend: false
+      successfulJobsHistoryLimit: 1     # Only keep last successful check
+      failedJobsHistoryLimit: 5         # Keep last 5 failed checks for debugging
+      startingDeadlineSeconds: 60       # 1 minute deadline
+      activeDeadlineSeconds: 120        # 2 minutes max execution
+      backoffLimit: 0                   # Don't retry health checks
+      ttlSecondsAfterFinished: 300      # Clean up after 5 minutes
+      restartPolicy: Never
+      command: ["sh", "-c"]
+      args:
+        - |
+          echo "Starting health check at $(date)"
+
+          # Check frontend
+          if curl -f -s --max-time 10 http://frontend/health > /dev/null; then
+            echo "Frontend: OK"
+          else
+            echo "Frontend: FAILED"
+            exit 1
+          fi
+
+          # Check backend API
+          if curl -f -s --max-time 10 http://backend:8080/health > /dev/null; then
+            echo "Backend: OK"
+          else
+            echo "Backend: FAILED"
+            exit 1
+          fi
+
+          echo "All services healthy at $(date)"
+      annotations:
+        monitoring.kubernetes.io/type: "health-check"
+        monitoring.kubernetes.io/frequency: "5min"
+    resources:
+      limits:
+        cpu: 50m
+        memory: 32Mi
+      requests:
+        cpu: 10m
+        memory: 16Mi
+
+# Global defaults that apply to all deployments
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 2000
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+  capabilities:
+    drop:
+    - ALL
+
+# Service account settings
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/my-service-role
+  name: ""
+
+# Network policies, affinity rules, etc. can be set globally
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Global ingress configuration (alternative to per-deployment ingress)
+# This creates a single ingress that routes to multiple services
+ingress:
+  enabled: false  # Set to true to use global ingress instead of per-deployment
+  className: "nginx"
+  annotations:
+    kubernetes.io/tls-acme: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+  hosts:
+    - host: myapp.com
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: frontend
+          servicePort: 80
+        - path: /api/(.*)
+          pathType: ImplementationSpecific
+          serviceName: backend
+          servicePort: 8080
+  tls:
+    - secretName: myapp-tls
+      hosts:
+        - myapp.com
+
+# Global ConfigMaps shared across deployments
+configMaps:
+  enabled: true
+  maps:
+    # Shared database configuration
+    database-config:
+      annotations:
+        config.kubernetes.io/source: "shared-database-config"
+      data:
+        database.properties: |
+          # Database connection settings
+          db.host=postgres.myapp.svc.cluster.local
+          db.port=5432
+          db.name=myapp_production
+          db.ssl=true
+          db.sslmode=require
+          # Connection pool settings
+          db.pool.min=5
+          db.pool.max=20
+          db.pool.idle_timeout=300
+          db.pool.max_lifetime=1800
+        postgresql.conf: |
+          # PostgreSQL configuration overrides
+          max_connections = 200
+          shared_buffers = 256MB
+          effective_cache_size = 1GB
+          work_mem = 4MB
+          maintenance_work_mem = 64MB
+          checkpoint_completion_target = 0.9
+          wal_buffers = 16MB
+          default_statistics_target = 100
+
+    # Shared Redis configuration
+    redis-config:
+      annotations:
+        config.kubernetes.io/source: "shared-redis-config"
+      data:
+        redis.conf: |
+          # Redis configuration
+          maxmemory 512mb
+          maxmemory-policy allkeys-lru
+          save 900 1
+          save 300 10
+          save 60 10000
+          appendonly yes
+          appendfsync everysec
+          timeout 300
+          tcp-keepalive 60
+        sentinel.conf: |
+          # Redis Sentinel configuration
+          port 26379
+          sentinel monitor mymaster redis-master 6379 2
+          sentinel down-after-milliseconds mymaster 5000
+          sentinel failover-timeout mymaster 10000
+          sentinel parallel-syncs mymaster 1
+
+    # Monitoring and logging configuration
+    monitoring-config:
+      annotations:
+        config.kubernetes.io/source: "monitoring-config"
+      data:
+        prometheus.yml: |
+          global:
+            scrape_interval: 15s
+            evaluation_interval: 15s
+          scrape_configs:
+            - job_name: 'kubernetes-pods'
+              kubernetes_sd_configs:
+                - role: pod
+              relabel_configs:
+                - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+                  action: keep
+                  regex: true
+                - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+                  action: replace
+                  target_label: __metrics_path__
+                  regex: (.+)
+        fluent-bit.conf: |
+          [SERVICE]
+              Flush         1
+              Log_Level     info
+              Daemon        off
+              Parsers_File  parsers.conf
+
+          [INPUT]
+              Name              tail
+              Path              /var/log/containers/*.log
+              Parser            docker
+              Tag               kube.*
+              Refresh_Interval  5
+              Mem_Buf_Limit     50MB
+
+          [OUTPUT]
+              Name  forward
+              Match *
+              Host  fluentd
+              Port  24224
+
+# Global ExternalSecrets shared across deployments
+externalSecrets:
+  enabled: true
+  secrets:
+    # Shared database credentials
+    database-credentials:
+      refreshInterval: "1h"
+      secretStoreRef:
+        name: vault-backend
+        kind: SecretStore
+      target:
+        name: database-credentials
+        creationPolicy: Owner
+        template:
+          type: Opaque
+          metadata:
+            labels:
+              app.kubernetes.io/name: database-credentials
+              secrets.kubernetes.io/type: database
+          data:
+            POSTGRES_USER: "{{ .username }}"
+            POSTGRES_PASSWORD: "{{ .password }}"
+            POSTGRES_DB: "{{ .database }}"
+            POSTGRES_HOST: "{{ .host }}"
+            POSTGRES_PORT: "{{ .port }}"
+            POSTGRES_URL: "postgresql://{{ .username }}:{{ .password }}@{{ .host }}:{{ .port }}/{{ .database }}"
+      data:
+        - secretKey: username
+          remoteRef:
+            key: secret/shared/database
+            property: username
+        - secretKey: password
+          remoteRef:
+            key: secret/shared/database
+            property: password
+        - secretKey: database
+          remoteRef:
+            key: secret/shared/database
+            property: database
+        - secretKey: host
+          remoteRef:
+            key: secret/shared/database
+            property: host
+        - secretKey: port
+          remoteRef:
+            key: secret/shared/database
+            property: port
+      annotations:
+        external-secrets.io/backend: "vault"
+        external-secrets.io/role: "database-reader"
+
+    # SSL certificates and TLS secrets
+    tls-certificates:
+      refreshInterval: "24h"
+      secretStoreRef:
+        name: aws-secrets-manager
+        kind: ClusterSecretStore
+      target:
+        name: tls-certificates
+        creationPolicy: Owner
+        template:
+          type: kubernetes.io/tls
+          metadata:
+            labels:
+              app.kubernetes.io/name: tls-certificates
+              secrets.kubernetes.io/type: tls
+          data:
+            tls.crt: "{{ .certificate | b64dec }}"
+            tls.key: "{{ .private_key | b64dec }}"
+      data:
+        - secretKey: certificate
+          remoteRef:
+            key: myapp/tls/production
+            property: certificate
+        - secretKey: private_key
+          remoteRef:
+            key: myapp/tls/production
+            property: private_key
+      annotations:
+        external-secrets.io/backend: "aws"
+        external-secrets.io/region: "us-east-1"
+
+    # Monitoring and observability secrets
+    monitoring-secrets:
+      refreshInterval: "6h"
+      secretStoreRef:
+        name: vault-backend
+        kind: SecretStore
+      target:
+        name: monitoring-secrets
+        creationPolicy: Owner
+      dataFrom:
+        - extract:
+            key: secret/monitoring/tokens
+          rewrite:
+            - regexp:
+                source: "(.*)_token$"
+                target: "$1_API_TOKEN"
+        - extract:
+            key: secret/monitoring/webhooks
+          rewrite:
+            - regexp:
+                source: "(.*)_webhook$"
+                target: "$1_WEBHOOK_URL"
+      annotations:
+        external-secrets.io/backend: "vault"
+        external-secrets.io/purpose: "monitoring"

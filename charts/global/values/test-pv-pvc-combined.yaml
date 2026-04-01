@@ -1,0 +1,105 @@
+# Combined test values file for both Persistent Volumes and Persistent Volume Claims
+# This demonstrates how PVs and PVCs can work together
+
+nameOverride: "combined-storage"
+
+# Persistent Volumes configuration
+persistentVolumes:
+  enabled: true
+  volumes:
+    # Local storage PV
+    local-pv:
+      enabled: true
+      capacity:
+        storage: 50Gi
+      accessModes:
+        - ReadWriteOnce
+      persistentVolumeReclaimPolicy: Retain
+      storageClassName: "local-storage"
+      local:
+        path: /mnt/local-storage
+      nodeAffinity:
+        required:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+              - worker-node-1
+      labels:
+        storage-type: "local"
+        usage: "database"
+
+    # NFS shared PV
+    nfs-pv:
+      enabled: true
+      capacity:
+        storage: 100Gi
+      accessModes:
+        - ReadWriteMany
+      persistentVolumeReclaimPolicy: Retain
+      storageClassName: "nfs"
+      nfs:
+        server: nfs.example.com
+        path: /exports/shared
+      labels:
+        storage-type: "nfs"
+        shared: "true"
+
+# Persistent Volume Claims configuration
+persistentVolumeClaims:
+  enabled: true
+  claims:
+    # PVC that will bind to the local PV
+    database-pvc:
+      enabled: true
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 50Gi
+      storageClassName: "local-storage"
+      selector:
+        matchLabels:
+          storage-type: "local"
+          usage: "database"
+      labels:
+        app: "database"
+        environment: "production"
+
+    # PVC that will bind to the NFS PV
+    shared-pvc:
+      enabled: true
+      accessModes:
+        - ReadWriteMany
+      resources:
+        requests:
+          storage: 100Gi
+      storageClassName: "nfs"
+      selector:
+        matchLabels:
+          storage-type: "nfs"
+          shared: "true"
+      labels:
+        app: "shared-app"
+        type: "shared"
+
+    # Dynamic PVC (no specific PV binding)
+    dynamic-pvc:
+      enabled: true
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 20Gi
+      storageClassName: "fast-ssd"
+      labels:
+        app: "web-app"
+        provisioning: "dynamic"
+
+# Disable default deployments for cleaner test output
+deployments:
+  frontend:
+    enabled: false
+  backend:
+    enabled: false

@@ -1,0 +1,83 @@
+# Test values for ArgoCD Rollout blue-green deployment strategy
+deployments:
+  webapp:
+    enabled: true
+    replicaCount: 4
+    image:
+      repository: nginx
+      tag: "1.21-alpine"
+      pullPolicy: IfNotPresent
+    ports:
+      - name: http
+        containerPort: 80
+        protocol: TCP
+    env:
+      - name: ENVIRONMENT
+        value: "production"
+    livenessProbe:
+      httpGet:
+        path: /health
+        port: http
+      initialDelaySeconds: 20
+      periodSeconds: 30
+    readinessProbe:
+      httpGet:
+        path: /ready
+        port: http
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+
+    # Blue-Green rollout configuration
+    rollout:
+      enabled: true
+      annotations:
+        rollout.argoproj.io/description: "Web application blue-green deployment"
+        rollout.argoproj.io/managed-by: "argocd"
+      labels:
+        deployment-strategy: "blue-green"
+        tier: "frontend"
+      revisionHistoryLimit: 3
+      progressDeadlineSeconds: 600
+      strategy:
+        type: blueGreen
+        blueGreen:
+          activeService: webapp-active
+          previewService: webapp-preview
+          autoPromotionEnabled: false
+          scaleDownDelaySeconds: 600
+          prePromotionAnalysis:
+            templates:
+              - templateName: http-success-rate
+                clusterScope: false
+              - templateName: response-time-p95
+                clusterScope: false
+            args:
+              - name: service-name
+                value: "webapp"
+              - name: namespace
+                value: "default"
+              - name: success-threshold
+                value: "95"
+          postPromotionAnalysis:
+            templates:
+              - templateName: http-success-rate
+                clusterScope: false
+            args:
+              - name: service-name
+                value: "webapp"
+              - name: monitoring-period
+                value: "300"
+          previewReplicaCount: 2
+          antiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: webapp
+                topologyKey: kubernetes.io/hostname

@@ -1,0 +1,9 @@
+deployments:
+  worker:
+    enabled: true
+    image:
+      repository: worker
+      tag: v1.0.0
+    ports:
+      - name: http
+        containerPort: 8080

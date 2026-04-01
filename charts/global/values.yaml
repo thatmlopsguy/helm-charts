@@ -117,6 +117,34 @@ deployments: # {}
           hosts:
             - api.example.com
             - backend.example.com
+    # Example HTTPRoute configuration for Gateway API:
+    # httpRoute:
+    #   enabled: true
+    #   annotations:
+    #     gateway.example.com/version: "1"
+    #   parentRefs:
+    #     - name: my-gateway
+    #       namespace: istio-system
+    #       sectionName: http
+    #       port: 80
+    #   hostnames:
+    #     - api.example.com
+    #     - backend.example.com
+    #   rules:
+    #     - matches:
+    #         - path:
+    #             type: PathPrefix
+    #             value: /api
+    #       backendRefs:
+    #         - name: my-app-backend
+    #           port: 8080
+    #       filters:
+    #         - type: RequestHeaderModifier
+    #           requestHeaderModifier:
+    #             add:
+    #               X-Version: "v1"
+    #       timeouts:
+    #         request: 30s
     # Example HPA configuration:
     # autoscaling:
     #   enabled: true
@@ -1004,6 +1032,50 @@ ingress:
     # - secretName: myapp-tls
     #   hosts:
     #     - myapp.example.com
+
+# Global HTTPRoute configuration (optional)
+# Requires Gateway API CRDs to be installed
+# This can route traffic to multiple services using Gateway API HTTPRoute
+httpRoute:
+  enabled: false
+  annotations: {}
+  # parentRefs defines the Gateway(s) that this HTTPRoute is associated with
+  parentRefs: []
+    # - name: my-gateway
+    #   namespace: istio-system
+    #   sectionName: http
+    #   port: 80
+  # hostnames that this HTTPRoute is associated with
+  hostnames: []
+    # - myapp.example.com
+    # - api.example.com
+  rules: []
+    # - matches:
+    #     - path:
+    #         type: PathPrefix
+    #         value: /api
+    #       method: GET
+    #   backendRefs:
+    #     - name: backend
+    #       namespace: default
+    #       port: 8080
+    #       weight: 100
+    #   filters:
+    #     - type: RequestHeaderModifier
+    #       requestHeaderModifier:
+    #         add:
+    #           X-Custom-Header: "custom-value"
+    #   timeouts:
+    #     request: 30s
+    #     backendRequest: 25s
+    # - matches:
+    #     - path:
+    #         type: PathPrefix
+    #         value: /
+    #   backendRefs:
+    #     - name: frontend
+    #       namespace: default
+    #       port: 80
 
 # Image pull secrets (applied to all deployments by default)
 imagePullSecrets: []

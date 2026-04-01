@@ -1,0 +1,93 @@
+# Test values file for StatefulSet template
+# This demonstrates a simple StatefulSet configuration
+
+nameOverride: "test-statefulset"
+
+# StatefulSet configuration
+statefulsets:
+  database:
+    enabled: true
+    replicaCount: 3
+    image:
+      repository: postgres
+      tag: "13"
+      pullPolicy: IfNotPresent
+
+    # Service name for StatefulSet
+    serviceName: "postgres-headless"
+
+    # Pod management policy
+    podManagementPolicy: "OrderedReady"
+
+    # Update strategy
+    updateStrategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxUnavailable: 1
+
+    # Container ports
+    ports:
+      - name: postgres
+        containerPort: 5432
+        protocol: TCP
+
+    # Environment variables
+    env:
+      - name: POSTGRES_DB
+        value: "testdb"
+      - name: POSTGRES_USER
+        value: "testuser"
+      - name: POSTGRES_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: postgres-secret
+            key: password
+
+    # Volume mounts
+    volumeMounts:
+      - name: postgres-data
+        mountPath: /var/lib/postgresql/data
+        subPath: postgres
+
+    # Resources
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+
+    # Volume claim templates for persistent storage
+    volumeClaimTemplates:
+      - metadata:
+          name: postgres-data
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          storageClassName: "standard"
+          resources:
+            requests:
+              storage: 10Gi
+
+    # Probes
+    readinessProbe:
+      exec:
+        command:
+          - /bin/sh
+          - -c
+          - pg_isready -U testuser -d testdb
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+
+    livenessProbe:
+      exec:
+        command:
+          - /bin/sh
+          - -c
+          - pg_isready -U testuser -d testdb
+      initialDelaySeconds: 60
+      periodSeconds: 30
+      timeoutSeconds: 10
+      failureThreshold: 3

@@ -1,0 +1,10 @@
+deployments:
+  simple-job:
+    enabled: true
+    image:
+      repository: busybox
+      tag: latest
+    job:
+      enabled: true
+      restartPolicy: Never
+      command: ["echo", "Hello World!"]

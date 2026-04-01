@@ -1,0 +1,41 @@
+# Simple test values file for Persistent Volume Claims template
+# This demonstrates basic PVC configuration
+
+nameOverride: "simple-pvc"
+
+# Simple Persistent Volume Claims configuration
+persistentVolumeClaims:
+  enabled: true
+  claims:
+    # Basic app storage
+    app-storage:
+      enabled: true
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 20Gi
+      storageClassName: "standard"
+      labels:
+        app: "myapp"
+        environment: "production"
+
+    # Shared cache storage
+    cache-storage:
+      enabled: true
+      accessModes:
+        - ReadWriteMany
+      resources:
+        requests:
+          storage: 5Gi
+      storageClassName: "nfs"
+      labels:
+        app: "cache"
+        type: "shared"
+
+# Disable default deployments for cleaner test output
+deployments:
+  frontend:
+    enabled: false
+  backend:
+    enabled: false

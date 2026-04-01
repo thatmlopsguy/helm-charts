@@ -1,0 +1,146 @@
+# Test values file for Persistent Volume template
+# This demonstrates multiple PVs with different storage types
+
+nameOverride: "test-pv"
+
+# Multiple Persistent Volumes configuration
+persistentVolumes:
+  enabled: true
+  volumes:
+    # Local storage example
+    local-storage:
+      enabled: true
+      capacity:
+        storage: 50Gi
+      accessModes:
+        - ReadWriteOnce
+      persistentVolumeReclaimPolicy: Retain
+      storageClassName: "local-storage"
+      volumeMode: Filesystem
+      local:
+        path: /mnt/storage/local-pv
+      nodeAffinity:
+        required:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+              - worker-node-1
+      annotations:
+        pv.kubernetes.io/provisioned-by: "local-volume-provisioner"
+      labels:
+        storage-type: "local"
+        performance: "high"
+
+    # NFS shared storage example
+    nfs-shared:
+      enabled: true
+      capacity:
+        storage: 100Gi
+      accessModes:
+        - ReadWriteMany
+      persistentVolumeReclaimPolicy: Retain
+      storageClassName: "nfs"
+      mountOptions:
+        - hard
+        - nfsvers=4.1
+        - timeo=600
+        - retrans=2
+      nfs:
+        server: nfs.example.com
+        path: /shared/storage
+      annotations:
+        pv.kubernetes.io/provisioned-by: "nfs-provisioner"
+      labels:
+        storage-type: "nfs"
+        shared: "true"
+
+    # CSI volume example
+    csi-volume:
+      enabled: true
+      capacity:
+        storage: 15Gi
+      accessModes:
+        - ReadWriteOnce
+      persistentVolumeReclaimPolicy: Delete
+      storageClassName: "csi-storage"
+      volumeMode: Filesystem
+      csi:
+        driver: example.csi.driver
+        volumeHandle: vol-unique-id-12345
+        readOnly: false
+        fsType: ext4
+        volumeAttributes:
+          storage.kubernetes.io/csiProvisionerIdentity: "unique-id-67890"
+          type: "gp3"
+          iops: "3000"
+        controllerPublishSecretRef:
+          name: csi-secret
+          namespace: kube-system
+        nodeStageSecretRef:
+          name: csi-secret
+          namespace: kube-system
+        nodePublishSecretRef:
+          name: csi-secret
+          namespace: kube-system
+      annotations:
+        pv.kubernetes.io/provisioned-by: "example.csi.driver"
+      labels:
+        storage-type: "csi"
+        driver: "example-csi"
+
+    # HostPath example (for development only)
+    hostpath-dev:
+      enabled: false  # Disabled by default
+      capacity:
+        storage: 10Gi
+      accessModes:
+        - ReadWriteOnce
+      persistentVolumeReclaimPolicy: Delete
+      storageClassName: "hostpath"
+      hostPath:
+        path: /tmp/hostpath-storage
+        type: DirectoryOrCreate
+      nodeAffinity:
+        required:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+              - minikube
+      annotations:
+        pv.kubernetes.io/provisioned-by: "kubernetes.io/host-path"
+      labels:
+        storage-type: "hostpath"
+        environment: "development"
+
+    # Pre-bound PV example
+    database-storage:
+      enabled: true
+      capacity:
+        storage: 50Gi
+      accessModes:
+        - ReadWriteOnce
+      persistentVolumeReclaimPolicy: Retain
+      storageClassName: "fast-ssd"
+      local:
+        path: /mnt/database-storage
+      nodeAffinity:
+        required:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+              - database-node
+      claimRef:
+        name: database-pvc
+        namespace: production
+      annotations:
+        pv.kubernetes.io/provisioned-by: "local-volume-provisioner"
+      labels:
+        storage-type: "local"
+        usage: "database"
+        tier: "production"

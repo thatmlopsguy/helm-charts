@@ -1,0 +1,11 @@
+deployments:
+  backup:
+    enabled: true
+    image:
+      repository: busybox
+      tag: latest
+    cronJob:
+      enabled: true
+      schedule: "0 2 * * *"
+      command: ["echo"]
+      args: ["Hello from CronJob!"]

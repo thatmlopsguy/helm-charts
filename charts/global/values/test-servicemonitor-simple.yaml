@@ -1,0 +1,76 @@
+# Simple test values file for ServiceMonitor
+# This demonstrates basic Prometheus ServiceMonitor configuration
+
+nameOverride: "simple-metrics"
+
+# Simple deployment with basic ServiceMonitor
+deployments:
+  web:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: nginx
+      tag: "1.21"
+      pullPolicy: IfNotPresent
+
+    ports:
+      - name: http
+        containerPort: 80
+        protocol: TCP
+      - name: metrics
+        containerPort: 9113
+        protocol: TCP
+
+    service:
+      enabled: true
+      type: ClusterIP
+      ports:
+        - name: http
+          port: 80
+          targetPort: http
+          protocol: TCP
+        - name: metrics
+          port: 9113
+          targetPort: metrics
+          protocol: TCP
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9113"
+
+    # Simple ServiceMonitor for basic metrics collection
+    serviceMonitor:
+      enabled: true
+      labels:
+        monitoring: "prometheus"
+        component: "web"
+
+      targetLabels:
+        - "app.kubernetes.io/name"
+        - "app.kubernetes.io/version"
+
+      endpoints:
+        - port: metrics
+          path: /metrics
+          interval: 30s
+          scrapeTimeout: 10s
+
+          relabelings:
+            # Add service type label
+            - targetLabel: service_type
+              replacement: web-server
+            # Set job name
+            - targetLabel: job
+              replacement: nginx-metrics
+
+# Disable other services for clean test output
+  frontend:
+    enabled: false
+  backend:
+    enabled: false
+
+# Disable storage for clean output
+persistentVolumes:
+  enabled: false
+persistentVolumeClaims:
+  enabled: false
+statefulsets: {}

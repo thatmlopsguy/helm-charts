@@ -1,0 +1,391 @@
+{{/*
+Support for multiple HTTPRoutes - iterate over deployments map and create routes for those that need them
+*/}}
+{{- range $deploymentName, $deployment := .Values.deployments }}
+{{- if and (kindOf $deployment | eq "map") ($deployment.enabled) ($deployment.httpRoute) ($deployment.httpRoute.enabled) }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "global.fullname" $ }}-{{ $deploymentName }}
+  namespace: {{ $deployment.namespace | default $.Values.namespace | default $.Release.Namespace }}
+  labels:
+    {{- include "global.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $deploymentName }}
+  {{- with $deployment.httpRoute.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if $deployment.httpRoute.parentRefs }}
+  parentRefs:
+    {{- range $deployment.httpRoute.parentRefs }}
+    - name: {{ .name | quote }}
+      {{- if .namespace }}
+      namespace: {{ .namespace | quote }}
+      {{- end }}
+      {{- if .sectionName }}
+      sectionName: {{ .sectionName | quote }}
+      {{- end }}
+      {{- if .port }}
+      port: {{ .port }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+  hostnames:
+    {{- if $deployment.httpRoute.hostnames }}
+    {{- toYaml $deployment.httpRoute.hostnames | nindent 4 }}
+    {{- else }}
+    - {{ include "global.fullname" $ }}-{{ $deploymentName }}.example.com
+    {{- end }}
+  rules:
+    {{- range $deployment.httpRoute.rules }}
+    - {{- if .matches }}
+      matches:
+        {{- range .matches }}
+        - {{- if .path }}
+          path:
+            type: {{ .path.type | default "PathPrefix" }}
+            value: {{ .path.value | default "/" }}
+          {{- end }}
+          {{- if .headers }}
+          headers:
+            {{- range .headers }}
+            - name: {{ .name }}
+              value: {{ .value }}
+            {{- end }}
+          {{- end }}
+          {{- if .queryParams }}
+          queryParams:
+            {{- range .queryParams }}
+            - name: {{ .name }}
+              value: {{ .value }}
+            {{- end }}
+          {{- end }}
+          {{- if .method }}
+          method: {{ .method }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      backendRefs:
+        {{- if .backendRefs }}
+        {{- range .backendRefs }}
+        - name: {{ .name | default (printf "%s-%s" (include "global.fullname" $) $deploymentName) }}
+          namespace: {{ .namespace | default $deployment.namespace | default $.Values.namespace | default $.Release.Namespace }}
+          {{- if .port }}
+          port: {{ .port }}
+          {{- else if .portName }}
+          port: {{ include "resolvePort" (dict "deployment" $deployment "portName" .portName) }}
+          {{- else }}
+          port: {{ include "resolveDefaultPort" (dict "deployment" $deployment) }}
+          {{- end }}
+          {{- if .weight }}
+          weight: {{ .weight }}
+          {{- end }}
+        {{- end }}
+        {{- else }}
+        - name: {{ include "global.fullname" $ }}-{{ $deploymentName }}
+          namespace: {{ $deployment.namespace | default $.Values.namespace | default $.Release.Namespace }}
+          {{- if $deployment.httpRoute.backendPort }}
+          port: {{ $deployment.httpRoute.backendPort }}
+          {{- else if $deployment.httpRoute.backendPortName }}
+          port: {{ include "resolvePort" (dict "deployment" $deployment "portName" $deployment.httpRoute.backendPortName) }}
+          {{- else }}
+          port: {{ include "resolveDefaultPort" (dict "deployment" $deployment) }}
+          {{- end }}
+        {{- end }}
+      {{- if .filters }}
+      filters:
+        {{- range .filters }}
+        - type: {{ .type }}
+          {{- if eq .type "RequestHeaderModifier" }}
+          requestHeaderModifier:
+            {{- if .requestHeaderModifier.add }}
+            add:
+              {{- toYaml .requestHeaderModifier.add | nindent 14 }}
+            {{- end }}
+            {{- if .requestHeaderModifier.remove }}
+            remove:
+              {{- toYaml .requestHeaderModifier.remove | nindent 14 }}
+            {{- end }}
+            {{- if .requestHeaderModifier.set }}
+            set:
+              {{- toYaml .requestHeaderModifier.set | nindent 14 }}
+            {{- end }}
+          {{- else if eq .type "ResponseHeaderModifier" }}
+          responseHeaderModifier:
+            {{- if .responseHeaderModifier.add }}
+            add:
+              {{- toYaml .responseHeaderModifier.add | nindent 14 }}
+            {{- end }}
+            {{- if .responseHeaderModifier.remove }}
+            remove:
+              {{- toYaml .responseHeaderModifier.remove | nindent 14 }}
+            {{- end }}
+            {{- if .responseHeaderModifier.set }}
+            set:
+              {{- toYaml .responseHeaderModifier.set | nindent 14 }}
+            {{- end }}
+          {{- else if eq .type "RequestRedirect" }}
+          requestRedirect:
+            {{- if .requestRedirect.scheme }}
+            scheme: {{ .requestRedirect.scheme }}
+            {{- end }}
+            {{- if .requestRedirect.hostname }}
+            hostname: {{ .requestRedirect.hostname }}
+            {{- end }}
+            {{- if .requestRedirect.port }}
+            port: {{ .requestRedirect.port }}
+            {{- end }}
+            {{- if .requestRedirect.statusCode }}
+            statusCode: {{ .requestRedirect.statusCode }}
+            {{- end }}
+            {{- if .requestRedirect.path }}
+            path:
+              type: {{ .requestRedirect.path.type }}
+              {{- if .requestRedirect.path.replaceFullPath }}
+              replaceFullPath: {{ .requestRedirect.path.replaceFullPath }}
+              {{- end }}
+              {{- if .requestRedirect.path.replacePrefixMatch }}
+              replacePrefixMatch: {{ .requestRedirect.path.replacePrefixMatch }}
+              {{- end }}
+            {{- end }}
+          {{- else if eq .type "URLRewrite" }}
+          urlRewrite:
+            {{- if .urlRewrite.hostname }}
+            hostname: {{ .urlRewrite.hostname }}
+            {{- end }}
+            {{- if .urlRewrite.path }}
+            path:
+              type: {{ .urlRewrite.path.type }}
+              {{- if .urlRewrite.path.replaceFullPath }}
+              replaceFullPath: {{ .urlRewrite.path.replaceFullPath }}
+              {{- end }}
+              {{- if .urlRewrite.path.replacePrefixMatch }}
+              replacePrefixMatch: {{ .urlRewrite.path.replacePrefixMatch }}
+              {{- end }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- if .timeouts }}
+      timeouts:
+        {{- if .timeouts.request }}
+        request: {{ .timeouts.request }}
+        {{- end }}
+        {{- if .timeouts.backendRequest }}
+        backendRequest: {{ .timeouts.backendRequest }}
+        {{- end }}
+      {{- end }}
+      {{- if .retries }}
+      retries:
+        {{- if .retries.attempts }}
+        attempts: {{ .retries.attempts }}
+        {{- end }}
+        {{- if .retries.backoffPolicy }}
+        backoffPolicy: {{ .retries.backoffPolicy }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
+Support for a global/shared HTTPRoute that can route to multiple services
+*/}}
+{{- if .Values.httpRoute.enabled }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "global.fullname" . }}
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "global.labels" . | nindent 4 }}
+  {{- with .Values.httpRoute.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.httpRoute.parentRefs }}
+  parentRefs:
+    {{- range .Values.httpRoute.parentRefs }}
+    - name: {{ .name | quote }}
+      {{- if .namespace }}
+      namespace: {{ .namespace | quote }}
+      {{- end }}
+      {{- if .sectionName }}
+      sectionName: {{ .sectionName | quote }}
+      {{- end }}
+      {{- if .port }}
+      port: {{ .port }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+  {{- if .Values.httpRoute.hostnames }}
+  hostnames:
+    {{- toYaml .Values.httpRoute.hostnames | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- range .Values.httpRoute.rules }}
+    - {{- if .matches }}
+      matches:
+        {{- range .matches }}
+        - {{- if .path }}
+          path:
+            type: {{ .path.type | default "PathPrefix" }}
+            value: {{ .path.value | default "/" }}
+          {{- end }}
+          {{- if .headers }}
+          headers:
+            {{- range .headers }}
+            - name: {{ .name }}
+              value: {{ .value }}
+            {{- end }}
+          {{- end }}
+          {{- if .queryParams }}
+          queryParams:
+            {{- range .queryParams }}
+            - name: {{ .name }}
+              value: {{ .value }}
+            {{- end }}
+          {{- end }}
+          {{- if .method }}
+          method: {{ .method }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      backendRefs:
+        {{- range .backendRefs }}
+        - name: {{ .name }}
+          {{- if .namespace }}
+          namespace: {{ .namespace }}
+          {{- else }}
+          namespace: {{ $.Values.namespace | default $.Release.Namespace }}
+          {{- end }}
+          {{- if .port }}
+          port: {{ .port }}
+          {{- end }}
+          {{- if .weight }}
+          weight: {{ .weight }}
+          {{- end }}
+        {{- end }}
+      {{- if .filters }}
+      filters:
+        {{- range .filters }}
+        - type: {{ .type }}
+          {{- if eq .type "RequestHeaderModifier" }}
+          requestHeaderModifier:
+            {{- if .requestHeaderModifier.add }}
+            add:
+              {{- toYaml .requestHeaderModifier.add | nindent 14 }}
+            {{- end }}
+            {{- if .requestHeaderModifier.remove }}
+            remove:
+              {{- toYaml .requestHeaderModifier.remove | nindent 14 }}
+            {{- end }}
+            {{- if .requestHeaderModifier.set }}
+            set:
+              {{- toYaml .requestHeaderModifier.set | nindent 14 }}
+            {{- end }}
+          {{- else if eq .type "ResponseHeaderModifier" }}
+          responseHeaderModifier:
+            {{- if .responseHeaderModifier.add }}
+            add:
+              {{- toYaml .responseHeaderModifier.add | nindent 14 }}
+            {{- end }}
+            {{- if .responseHeaderModifier.remove }}
+            remove:
+              {{- toYaml .responseHeaderModifier.remove | nindent 14 }}
+            {{- end }}
+            {{- if .responseHeaderModifier.set }}
+            set:
+              {{- toYaml .responseHeaderModifier.set | nindent 14 }}
+            {{- end }}
+          {{- else if eq .type "RequestRedirect" }}
+          requestRedirect:
+            {{- if .requestRedirect.scheme }}
+            scheme: {{ .requestRedirect.scheme }}
+            {{- end }}
+            {{- if .requestRedirect.hostname }}
+            hostname: {{ .requestRedirect.hostname }}
+            {{- end }}
+            {{- if .requestRedirect.port }}
+            port: {{ .requestRedirect.port }}
+            {{- end }}
+            {{- if .requestRedirect.statusCode }}
+            statusCode: {{ .requestRedirect.statusCode }}
+            {{- end }}
+            {{- if .requestRedirect.path }}
+            path:
+              type: {{ .requestRedirect.path.type }}
+              {{- if .requestRedirect.path.replaceFullPath }}
+              replaceFullPath: {{ .requestRedirect.path.replaceFullPath }}
+              {{- end }}
+              {{- if .requestRedirect.path.replacePrefixMatch }}
+              replacePrefixMatch: {{ .requestRedirect.path.replacePrefixMatch }}
+              {{- end }}
+            {{- end }}
+          {{- else if eq .type "URLRewrite" }}
+          urlRewrite:
+            {{- if .urlRewrite.hostname }}
+            hostname: {{ .urlRewrite.hostname }}
+            {{- end }}
+            {{- if .urlRewrite.path }}
+            path:
+              type: {{ .urlRewrite.path.type }}
+              {{- if .urlRewrite.path.replaceFullPath }}
+              replaceFullPath: {{ .urlRewrite.path.replaceFullPath }}
+              {{- end }}
+              {{- if .urlRewrite.path.replacePrefixMatch }}
+              replacePrefixMatch: {{ .urlRewrite.path.replacePrefixMatch }}
+              {{- end }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- if .timeouts }}
+      timeouts:
+        {{- if .timeouts.request }}
+        request: {{ .timeouts.request }}
+        {{- end }}
+        {{- if .timeouts.backendRequest }}
+        backendRequest: {{ .timeouts.backendRequest }}
+        {{- end }}
+      {{- end }}
+      {{- if .retries }}
+      retries:
+        {{- if .retries.attempts }}
+        attempts: {{ .retries.attempts }}
+        {{- end }}
+        {{- if .retries.backoffPolicy }}
+        backoffPolicy: {{ .retries.backoffPolicy }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+{{- end }}
+
+{{/*
+Helpers for resolving port numbers
+*/}}
+{{- define "resolvePort" -}}
+{{- $deployment := .deployment }}
+{{- $portName := .portName }}
+{{- if $deployment.ports }}
+  {{- range $deployment.ports }}
+    {{- if eq .name $portName }}
+{{ .containerPort }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- end }}
+
+{{- define "resolveDefaultPort" -}}
+{{- $deployment := .deployment }}
+{{- if $deployment.ports }}
+  {{- $firstPort := index $deployment.ports 0 }}
+{{ $firstPort.containerPort }}
+{{- else }}
+8080
+{{- end }}
+{{- end }}

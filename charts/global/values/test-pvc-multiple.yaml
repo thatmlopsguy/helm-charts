@@ -1,0 +1,88 @@
+# Test values file for Persistent Volume Claims template
+# This demonstrates multiple PVCs with different configurations
+
+nameOverride: "test-pvc"
+
+# Multiple Persistent Volume Claims configuration
+persistentVolumeClaims:
+  enabled: true
+  claims:
+    # Basic application data storage
+    app-data:
+      enabled: true
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 10Gi
+        limits:
+          storage: 20Gi
+      storageClassName: "fast-ssd"
+      volumeMode: Filesystem
+      annotations:
+        volume.beta.kubernetes.io/storage-class: "fast-ssd"
+      labels:
+        app: "myapp"
+        tier: "data"
+
+    # Shared storage for multiple pods
+    shared-storage:
+      enabled: true
+      accessModes:
+        - ReadWriteMany
+      resources:
+        requests:
+          storage: 50Gi
+      storageClassName: "nfs"
+      volumeName: "test-pvc-nfs-shared"  # Reference to corresponding PV
+      annotations:
+        volume.kubernetes.io/storage-provisioner: "nfs-provisioner"
+      labels:
+        storage-type: "nfs"
+        shared: "true"
+
+    # Database storage with selector
+    database-storage:
+      enabled: true
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 100Gi
+      storageClassName: "local-storage"
+      selector:
+        matchLabels:
+          usage: "database"
+          tier: "production"
+      annotations:
+        volume.beta.kubernetes.io/storage-class: "local-storage"
+      labels:
+        app: "database"
+        environment: "production"
+
+    # Block storage example (disabled by default)
+    block-storage:
+      enabled: false
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 100Gi
+      storageClassName: "block-storage"
+      volumeMode: Block
+      annotations:
+        volume.kubernetes.io/storage-class: "block-storage"
+      labels:
+        app: "database"
+        mode: "block"
+
+# Disable default deployments for cleaner test output
+deployments:
+  frontend:
+    enabled: false
+  backend:
+    enabled: false
+
+# Disable PVs to focus on PVCs
+persistentVolumes:
+  enabled: false

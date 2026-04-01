@@ -1,0 +1,42 @@
+---
+# Source: gitops-bridge/templates/argocdproject.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: infra-addons
+  namespace: argocd
+  labels:
+    helm.sh/chart: gitops-bridge-1.0.0
+    app.kubernetes.io/name: gitops-bridge
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  description: "Project for managing addon applications"
+
+  # Source repositories where applications can be deployed from
+  sourceRepos:
+    - '*'
+
+  # Destination clusters and namespaces where applications can be deployed
+  destinations:
+    - namespace: '*'
+      server: '*'
+
+  # Cluster resource whitelist - allows all resources
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+
+  # Namespace resource whitelist - allows all resources in namespaces
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+
+  # Sync windows (optional - allows sync at any time by default)
+  syncWindows: []
+
+  # Orphaned resources monitoring
+  orphanedResources:
+    warn: true

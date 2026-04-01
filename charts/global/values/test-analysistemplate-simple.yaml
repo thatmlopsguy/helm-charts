@@ -1,0 +1,77 @@
+# Simple test values file for AnalysisTemplate
+# This demonstrates basic ArgoCD AnalysisTemplate configuration
+
+nameOverride: "simple-analysis"
+
+# Simple deployment with basic AnalysisTemplate
+deployments:
+  web:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: nginx
+      tag: "1.21"
+      pullPolicy: IfNotPresent
+
+    ports:
+      - name: http
+        containerPort: 80
+        protocol: TCP
+
+    service:
+      enabled: true
+      type: ClusterIP
+      ports:
+        - name: http
+          port: 80
+          targetPort: http
+          protocol: TCP
+
+    # Simple AnalysisTemplate for basic health monitoring
+    analysisTemplate:
+      enabled: true
+      labels:
+        analysis-type: "health-check"
+        service: "web"
+
+      args:
+        - name: service-name
+          value: "simple-analysis-web"
+
+      metrics:
+        # Basic HTTP success rate
+        - name: success-rate
+          interval: 30s
+          count: 10
+          successCondition: result[0] >= 0.95
+          failureLimit: 3
+          provider:
+            prometheus:
+              address: http://prometheus:9090
+              query: |
+                sum(rate(nginx_http_requests_total{job="{{args.service-name}}", status=~"2.."}[1m])) /
+                sum(rate(nginx_http_requests_total{job="{{args.service-name}}"}[1m]))
+
+        # Simple web health check
+        - name: health-endpoint
+          interval: 45s
+          count: 5
+          successCondition: result == 200
+          provider:
+            web:
+              url: http://{{args.service-name}}/health
+              method: GET
+              timeoutSeconds: 5
+
+# Disable other services for clean test output
+  frontend:
+    enabled: false
+  backend:
+    enabled: false
+
+# Disable storage for clean output
+persistentVolumes:
+  enabled: false
+persistentVolumeClaims:
+  enabled: false
+statefulsets: {}

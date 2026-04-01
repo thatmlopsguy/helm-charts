@@ -1,0 +1,182 @@
+# Test values for Certificate resources
+# This file demonstrates various certificate configurations using cert-manager
+
+# Multiple deployments with certificate configurations
+deployments:
+  # Basic certificate with Let's Encrypt ClusterIssuer
+  webapp:
+    enabled: true
+    image:
+      repository: nginx
+      tag: "1.21.6"
+      pullPolicy: IfNotPresent
+    certificate:
+      enabled: true
+      # The secret name where the certificate will be stored
+      secretName: webapp-tls-cert
+      # Certificate issuer reference (ClusterIssuer or Issuer)
+      issuerRef:
+        name: letsencrypt-prod
+        kind: ClusterIssuer
+      # DNS names covered by the certificate
+      dnsNames:
+        - webapp.example.com
+        - www.webapp.example.com
+      # Common name for the certificate
+      commonName: webapp.example.com
+      # Certificate duration (default is 90 days for Let's Encrypt)
+      duration: 2160h # 90 days
+      # Renew certificate 30 days before expiry
+      renewBefore: 720h # 30 days
+      # Key usages
+      usages:
+        - digital signature
+        - key encipherment
+        - server auth
+      # Private key configuration
+      privateKey:
+        algorithm: RSA
+        size: 2048
+        rotationPolicy: Always
+      annotations:
+        cert-manager.io/revision-history-limit: "3"
+
+  # Advanced certificate with custom CA issuer and subject details
+  api-server:
+    enabled: true
+    image:
+      repository: alpine
+      tag: "3.15"
+      pullPolicy: IfNotPresent
+    certificate:
+      enabled: true
+      secretName: api-server-tls
+      issuerRef:
+        name: ca-issuer
+        kind: Issuer
+      commonName: api.mycompany.com
+      dnsNames:
+        - api.mycompany.com
+        - api-internal.mycompany.com
+      # IP addresses (useful for internal certificates)
+      ipAddresses:
+        - 192.168.1.100
+        - 10.0.0.50
+      duration: 8760h # 1 year
+      renewBefore: 2160h # 90 days
+      # Subject information
+      subject:
+        organizations:
+          - MyCompany Inc
+        countries:
+          - US
+        organizationalUnits:
+          - IT Department
+        localities:
+          - San Francisco
+        provinces:
+          - California
+      privateKey:
+        algorithm: ECDSA
+        size: 256
+      usages:
+        - digital signature
+        - key encipherment
+        - server auth
+        - client auth
+      # Enable CA certificate
+      isCA: false
+      # Keystore configuration for Java applications
+      keystores:
+        jks:
+          create: true
+          passwordSecretRef:
+            name: keystore-password
+            key: password
+        pkcs12:
+          create: true
+          passwordSecretRef:
+            name: keystore-password
+            key: password
+
+  # Certificate with email addresses and URIs
+  email-service:
+    enabled: true
+    image:
+      repository: mailhog/mailhog
+      tag: "v1.0.1"
+      pullPolicy: IfNotPresent
+    certificate:
+      enabled: true
+      secretName: email-service-tls
+      issuerRef:
+        name: internal-ca
+        kind: ClusterIssuer
+      dnsNames:
+        - mail.internal.com
+      # Email addresses for S/MIME certificates
+      emailAddresses:
+        - admin@internal.com
+        - support@internal.com
+      # URI SANs
+      uris:
+        - https://mail.internal.com/api
+        - spiffe://cluster.local/ns/default/sa/email-service
+      duration: 2160h # 90 days
+      renewBefore: 720h # 30 days
+      usages:
+        - digital signature
+        - key encipherment
+        - server auth
+        - email protection
+      privateKey:
+        algorithm: RSA
+        size: 4096
+      # Additional output formats
+      additionalOutputFormats:
+        - type: CombinedPEM
+        - type: DER
+
+  # Minimal certificate configuration
+  simple-app:
+    enabled: true
+    image:
+      repository: httpd
+      tag: "2.4"
+      pullPolicy: IfNotPresent
+    certificate:
+      enabled: true
+      issuerRef:
+        name: letsencrypt-staging
+        kind: ClusterIssuer
+      dnsNames:
+        - simple.example.com
+      # All other values will use defaults
+
+  # Certificate for development/testing with self-signed issuer
+  dev-service:
+    enabled: false # Disabled by default for production safety
+    image:
+      repository: nginx
+      tag: "alpine"
+      pullPolicy: IfNotPresent
+    certificate:
+      enabled: true
+      secretName: dev-service-selfsigned
+      issuerRef:
+        name: selfsigned-issuer
+        kind: Issuer
+      commonName: dev.localhost
+      dnsNames:
+        - dev.localhost
+        - "*.dev.localhost"
+      duration: 8760h # 1 year for development
+      usages:
+        - digital signature
+        - key encipherment
+        - server auth
+      privateKey:
+        algorithm: RSA
+        size: 2048
+      annotations:
+        cert-manager.io/revision-history-limit: "1"

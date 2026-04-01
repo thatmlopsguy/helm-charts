@@ -1,0 +1,254 @@
+# Test values file for ServiceMonitor
+# This demonstrates Prometheus ServiceMonitor configuration for metrics collection
+
+nameOverride: "metrics-app"
+
+# Deployments with ServiceMonitor configuration
+deployments:
+  api:
+    enabled: true
+    replicaCount: 3
+    image:
+      repository: myapp/api
+      tag: "v1.2.0"
+      pullPolicy: IfNotPresent
+
+    ports:
+      - name: http
+        containerPort: 8080
+        protocol: TCP
+      - name: metrics
+        containerPort: 9090
+        protocol: TCP
+      - name: admin
+        containerPort: 8081
+        protocol: TCP
+
+    service:
+      enabled: true
+      type: ClusterIP
+      ports:
+        - name: http
+          port: 80
+          targetPort: http
+          protocol: TCP
+        - name: metrics
+          port: 9090
+          targetPort: metrics
+          protocol: TCP
+        - name: admin
+          port: 8081
+          targetPort: admin
+          protocol: TCP
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+
+    # Comprehensive ServiceMonitor configuration
+    serviceMonitor:
+      enabled: true
+      namespace: monitoring
+      annotations:
+        monitoring.coreos.com/description: "API service metrics monitoring"
+        monitoring.coreos.com/team: "platform"
+      labels:
+        monitoring: "prometheus"
+        tier: "api"
+        environment: "production"
+
+      # Job and target configuration
+      jobLabel: "app.kubernetes.io/component"
+      targetLabels:
+        - "app.kubernetes.io/version"
+        - "app.kubernetes.io/name"
+      podTargetLabels:
+        - "app.kubernetes.io/instance"
+        - "pod-template-hash"
+
+      # Resource limits
+      sampleLimit: 10000
+      targetLimit: 100
+      labelLimit: 50
+      labelNameLengthLimit: 256
+      labelValueLengthLimit: 1024
+
+      # Additional service selector
+      selector:
+        matchLabels:
+          prometheus.io/scrape: "true"
+        matchExpressions:
+          - key: app.kubernetes.io/tier
+            operator: In
+            values: ["api", "backend"]
+
+      # Cross-namespace monitoring
+      namespaceSelector:
+        matchNames:
+          - default
+          - production
+
+      # Multiple metrics endpoints
+      endpoints:
+        # Main application metrics
+        - port: metrics
+          path: /metrics
+          scheme: http
+          interval: 30s
+          scrapeTimeout: 10s
+          honorLabels: false
+          honorTimestamps: true
+
+          # URL parameters
+          params:
+            format: ["prometheus"]
+            module: ["http_2xx"]
+
+          # Metric transformations
+          metricRelabelings:
+            # Drop high-cardinality metrics
+            - sourceLabels: [__name__]
+              regex: "http_request_duration_seconds_bucket"
+              action: drop
+            # Rename metrics with prefix
+            - sourceLabels: [__name__]
+              regex: "app_(.+)"
+              targetLabel: __name__
+              replacement: "api_${1}"
+            # Add environment label
+            - targetLabel: environment
+              replacement: production
+
+          relabelings:
+            # Add cluster label
+            - targetLabel: cluster
+              replacement: production-cluster
+            # Copy version from service label
+            - sourceLabels: [__meta_kubernetes_service_label_app_kubernetes_io_version]
+              targetLabel: version
+            # Set job name from component
+            - sourceLabels: [__meta_kubernetes_service_label_app_kubernetes_io_component]
+              targetLabel: job
+              replacement: "${1}-metrics"
+
+        # Admin/debug metrics endpoint
+        - port: admin
+          path: /debug/metrics
+          interval: 60s
+          scrapeTimeout: 5s
+          honorLabels: true
+
+          relabelings:
+            # Mark as admin metrics
+            - targetLabel: metrics_type
+              replacement: admin
+            # Extract instance name
+            - sourceLabels: [__address__]
+              regex: "([^:]+):.*"
+              targetLabel: instance
+              replacement: "${1}"
+            # Add debug job suffix
+            - sourceLabels: [__meta_kubernetes_service_label_app_kubernetes_io_component]
+              targetLabel: job
+              replacement: "${1}-debug"
+
+  # Database service with simpler ServiceMonitor
+  database:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: postgres
+      tag: "13"
+      pullPolicy: IfNotPresent
+
+    ports:
+      - name: postgres
+        containerPort: 5432
+        protocol: TCP
+      - name: metrics
+        containerPort: 9187
+        protocol: TCP
+
+    service:
+      enabled: true
+      type: ClusterIP
+      ports:
+        - name: postgres
+          port: 5432
+          targetPort: postgres
+          protocol: TCP
+        - name: metrics
+          port: 9187
+          targetPort: metrics
+          protocol: TCP
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9187"
+
+    # Simple ServiceMonitor for database metrics
+    serviceMonitor:
+      enabled: true
+      labels:
+        monitoring: "prometheus"
+        component: "database"
+
+      targetLabels:
+        - "app.kubernetes.io/name"
+
+      endpoints:
+        - port: metrics
+          path: /metrics
+          interval: 45s
+          scrapeTimeout: 15s
+
+          metricRelabelings:
+            # Add database prefix to metrics
+            - sourceLabels: [__name__]
+              regex: "pg_(.+)"
+              targetLabel: __name__
+              replacement: "database_${1}"
+
+          relabelings:
+            # Add database type label
+            - targetLabel: database_type
+              replacement: postgresql
+            # Set consistent job name
+            - targetLabel: job
+              replacement: database-metrics
+
+  # Frontend with disabled ServiceMonitor (should not appear in output)
+  frontend:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: nginx
+      tag: "1.21"
+      pullPolicy: IfNotPresent
+
+    ports:
+      - name: http
+        containerPort: 80
+        protocol: TCP
+
+    service:
+      enabled: true
+      type: ClusterIP
+      ports:
+        - name: http
+          port: 80
+          targetPort: http
+          protocol: TCP
+
+    # Disabled ServiceMonitor (should not be rendered)
+    serviceMonitor:
+      enabled: false
+      endpoints:
+        - port: http
+          path: /metrics
+
+# Disable other components for cleaner test output
+persistentVolumes:
+  enabled: false
+persistentVolumeClaims:
+  enabled: false
+statefulsets: {}

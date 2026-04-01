@@ -1,0 +1,31 @@
+deployments:
+  web:
+    enabled: true
+    image:
+      repository: nginx
+      tag: latest
+    configMap:
+      enabled: true
+      data:
+        nginx.conf: |
+          server {
+            listen 80;
+            location / {
+              root /usr/share/nginx/html;
+              index index.html;
+            }
+          }
+        app.properties: |
+          server.port=80
+          app.name=web
+          debug=false
+
+configMaps:
+  enabled: true
+  maps:
+    shared-config:
+      data:
+        common.properties: |
+          environment=production
+          region=us-east-1
+          cluster=k8s-prod

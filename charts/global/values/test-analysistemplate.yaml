@@ -1,0 +1,218 @@
+# Test values file for AnalysisTemplate
+# This demonstrates ArgoCD AnalysisTemplate configuration for canary deployments
+
+nameOverride: "canary-app"
+
+# Deployment with AnalysisTemplate configuration
+deployments:
+  api:
+    enabled: true
+    replicaCount: 3
+    image:
+      repository: myapp/api
+      tag: "v2.1.0"
+      pullPolicy: IfNotPresent
+
+    ports:
+      - name: http
+        containerPort: 8080
+        protocol: TCP
+
+    service:
+      enabled: true
+      type: ClusterIP
+      ports:
+        - name: http
+          port: 80
+          targetPort: http
+          protocol: TCP
+
+    # ArgoCD AnalysisTemplate for canary deployment validation
+    analysisTemplate:
+      enabled: true
+      annotations:
+        analysis.argoproj.io/description: "API canary deployment analysis"
+        analysis.argoproj.io/run-id: "canary-v2.1.0"
+      labels:
+        analysis-type: "canary"
+        service: "api"
+        version: "v2.1.0"
+
+      # Arguments for the analysis
+      args:
+        - name: service-name
+          value: "canary-app-api"
+        - name: namespace
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: app-version
+          value: "v2.1.0"
+
+      # Metrics to validate canary deployment
+      metrics:
+        # HTTP Success Rate
+        - name: http-success-rate
+          initialDelay: 60s
+          interval: 30s
+          count: 20
+          successCondition: result[0] >= 0.98
+          failureCondition: result[0] < 0.95
+          failureLimit: 3
+          consecutiveErrorLimit: 2
+          provider:
+            prometheus:
+              address: http://prometheus.monitoring.svc.cluster.local:9090
+              query: |
+                sum(rate(http_requests_total{service="{{args.service-name}}", code=~"2.."}[2m])) /
+                sum(rate(http_requests_total{service="{{args.service-name}}"}[2m]))
+
+        # Response Time P95
+        - name: response-time-p95
+          interval: 30s
+          count: 15
+          successCondition: result[0] <= 200
+          failureCondition: result[0] > 500
+          failureLimit: 2
+          provider:
+            prometheus:
+              address: http://prometheus.monitoring.svc.cluster.local:9090
+              query: |
+                histogram_quantile(0.95,
+                  sum(rate(http_request_duration_seconds_bucket{service="{{args.service-name}}"}[2m])) by (le)
+                ) * 1000
+
+        # Error Rate
+        - name: error-rate
+          interval: 45s
+          count: 10
+          successCondition: result[0] < 0.02
+          failureLimit: 2
+          provider:
+            prometheus:
+              address: http://prometheus.monitoring.svc.cluster.local:9090
+              query: |
+                sum(rate(http_requests_total{service="{{args.service-name}}", code=~"5.."}[2m])) /
+                sum(rate(http_requests_total{service="{{args.service-name}}"}[2m]))
+
+        # CPU Usage
+        - name: cpu-usage
+          interval: 60s
+          count: 8
+          successCondition: result[0] < 0.8
+          provider:
+            prometheus:
+              address: http://prometheus.monitoring.svc.cluster.local:9090
+              query: |
+                avg(rate(container_cpu_usage_seconds_total{pod=~"{{args.service-name}}-.*"}[2m]))
+
+        # Memory Usage
+        - name: memory-usage
+          interval: 60s
+          count: 8
+          successCondition: result[0] < 0.9
+          provider:
+            prometheus:
+              address: http://prometheus.monitoring.svc.cluster.local:9090
+              query: |
+                avg(container_memory_working_set_bytes{pod=~"{{args.service-name}}-.*"}) /
+                avg(container_spec_memory_limit_bytes{pod=~"{{args.service-name}}-.*"})
+
+        # Custom Health Check via Web API
+        - name: health-check
+          interval: 30s
+          count: 10
+          successCondition: result.status == "healthy"
+          provider:
+            web:
+              url: http://{{args.service-name}}.{{args.namespace}}.svc.cluster.local/health
+              headers:
+                - key: User-Agent
+                  value: "argo-rollouts-analysis"
+                - key: Accept
+                  value: "application/json"
+              jsonPath: "$.status"
+              method: GET
+              timeoutSeconds: 10
+
+      # Dry run for testing (optional)
+      dryRun:
+        - metricName: http-success-rate
+        - metricName: response-time-p95
+
+      # Measurement retention
+      measurementRetention:
+        - metricName: http-success-rate
+          limit: 50
+        - metricName: response-time-p95
+          limit: 50
+        - metricName: error-rate
+          limit: 30
+
+  # Backend service with different analysis configuration
+  backend:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: myapp/backend
+      tag: "v1.5.0"
+      pullPolicy: IfNotPresent
+
+    ports:
+      - name: grpc
+        containerPort: 9090
+        protocol: TCP
+
+    service:
+      enabled: true
+      type: ClusterIP
+      ports:
+        - name: grpc
+          port: 9090
+          targetPort: grpc
+          protocol: TCP
+
+    # Simpler AnalysisTemplate for backend service
+    analysisTemplate:
+      enabled: true
+      labels:
+        analysis-type: "basic"
+        service: "backend"
+
+      args:
+        - name: service-name
+          value: "canary-app-backend"
+
+      metrics:
+        # Basic success rate check
+        - name: grpc-success-rate
+          interval: 45s
+          count: 10
+          successCondition: result[0] >= 0.99
+          failureLimit: 2
+          provider:
+            prometheus:
+              address: http://prometheus.monitoring.svc.cluster.local:9090
+              query: |
+                sum(rate(grpc_server_handled_total{grpc_service="{{args.service-name}}", grpc_code="OK"}[3m])) /
+                sum(rate(grpc_server_handled_total{grpc_service="{{args.service-name}}"}[3m]))
+
+        # GRPC latency check
+        - name: grpc-latency
+          interval: 60s
+          count: 8
+          successCondition: result[0] <= 100
+          provider:
+            prometheus:
+              address: http://prometheus.monitoring.svc.cluster.local:9090
+              query: |
+                histogram_quantile(0.95,
+                  sum(rate(grpc_server_handling_seconds_bucket{grpc_service="{{args.service-name}}"}[3m])) by (le)
+                ) * 1000
+
+# Disable other components for cleaner test output
+persistentVolumes:
+  enabled: false
+persistentVolumeClaims:
+  enabled: false
+statefulsets: {}

@@ -1,0 +1,54 @@
+# Simple test values file for Persistent Volume template
+# This demonstrates basic PV configuration
+
+nameOverride: "simple-pv"
+
+# Simple Persistent Volume configuration
+persistentVolumes:
+  enabled: true
+  volumes:
+    # Basic local storage
+    app-storage:
+      enabled: true
+      capacity:
+        storage: 20Gi
+      accessModes:
+        - ReadWriteOnce
+      persistentVolumeReclaimPolicy: Retain
+      storageClassName: "local-storage"
+      local:
+        path: /mnt/app-storage
+      nodeAffinity:
+        required:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+              - worker-node-1
+      labels:
+        storage-type: "local"
+        environment: "production"
+
+    # Basic NFS storage
+    shared-data:
+      enabled: true
+      capacity:
+        storage: 50Gi
+      accessModes:
+        - ReadWriteMany
+      persistentVolumeReclaimPolicy: Retain
+      storageClassName: "nfs"
+      nfs:
+        server: nfs.internal.example.com
+        path: /exports/shared-data
+      labels:
+        storage-type: "nfs"
+        usage: "shared"
+
+# Disable default deployments for cleaner test output
+deployments:
+  frontend:
+    enabled: false
+  backend:
+    enabled: false
