@@ -65,6 +65,19 @@ entries:
   gatewayclass:
   - apiVersion: v2
     appVersion: 1.16.0
+    created: "2026-04-01T11:24:12.192882959Z"
+    description: A Helm chart for installing the Gateway API GatewayClass resource
+    digest: 11e6ed1b1caf2c01c296ba19fa2a679315e8796033da0917885a364e954b60d8
+    maintainers:
+    - name: thatmlopsguy
+      url: https://thatmlopsguy.github.io
+    name: gatewayclass
+    type: application
+    urls:
+    - https://github.com/thatmlopsguy/helm-charts/releases/download/gatewayclass-0.1.2/gatewayclass-0.1.2.tgz
+    version: 0.1.2
+  - apiVersion: v2
+    appVersion: 1.16.0
     created: "2026-04-01T11:10:54.948773208Z"
     description: A Helm chart for Kubernetes
     digest: 441ed0dec21799ad8610875ed37a07820d79ae24c3e2c98dd538ee3dca8fed73
@@ -150,4 +163,4 @@ entries:
     urls:
     - https://github.com/thatmlopsguy/helm-charts/releases/download/tenant-namespace-0.1.1/tenant-namespace-0.1.1.tgz
     version: 0.1.1
-generated: "2026-04-01T11:10:54.948796151Z"
+generated: "2026-04-01T11:24:12.192908737Z"
