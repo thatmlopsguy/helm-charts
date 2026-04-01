@@ -62,6 +62,20 @@ entries:
     urls:
     - https://github.com/thatmlopsguy/helm-charts/releases/download/crossplane-github-0.1.0/crossplane-github-0.1.0.tgz
     version: 0.1.0
+  gatewayclass:
+  - apiVersion: v2
+    appVersion: 1.16.0
+    created: "2026-04-01T11:10:54.948773208Z"
+    description: A Helm chart for Kubernetes
+    digest: 441ed0dec21799ad8610875ed37a07820d79ae24c3e2c98dd538ee3dca8fed73
+    maintainers:
+    - name: thatmlopsguy
+      url: https://thatmlopsguy.github.io
+    name: gatewayclass
+    type: application
+    urls:
+    - https://github.com/thatmlopsguy/helm-charts/releases/download/gatewayclass-0.1.1/gatewayclass-0.1.1.tgz
+    version: 0.1.1
   metallb-extras:
   - apiVersion: v2
     appVersion: 1.16.0
@@ -136,4 +150,4 @@ entries:
     urls:
     - https://github.com/thatmlopsguy/helm-charts/releases/download/tenant-namespace-0.1.1/tenant-namespace-0.1.1.tgz
     version: 0.1.1
-generated: "2025-07-02T21:03:36.476918609Z"
+generated: "2026-04-01T11:10:54.948796151Z"
