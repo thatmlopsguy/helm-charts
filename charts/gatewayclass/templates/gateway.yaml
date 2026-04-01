@@ -1,0 +1,15 @@
+{{- if .Values.gateways }}
+{{- range $index, $gw := .Values.gateways }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ $gw.name }}
+spec:
+  gatewayClassName: {{ $gw.gatewayClassName }}
+  {{- with $gw.listeners }}
+  listeners:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+---
+{{- end }}
+{{- end }}

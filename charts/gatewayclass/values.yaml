@@ -5,3 +5,11 @@ gatewayClasses:
     controllerName: example.net/region-gateway-controller
   - name: private-gateway
     controllerName: example.net/private-controller
+
+gateways:
+  - name: eg
+    gatewayClassName: eg
+    listeners:
+      - name: http
+        protocol: HTTP
+        port: 80
