@@ -8,6 +8,6 @@
 
 /charts/cert-manager-extras/ @thatmlopsguy
 /charts/crossplane-github/ @thatmlopsguy
-/charts/gitops-bridge/ @thatmlopsguy
 /charts/metallb-extras/ @thatmlopsguy
 /charts/tenant-namespace/ @thatmlopsguy
+/charts/gatewayclass/ @thatmlopsguy
