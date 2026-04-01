@@ -92,6 +92,20 @@ entries:
   metallb-extras:
   - apiVersion: v2
     appVersion: 1.16.0
+    created: "2026-04-01T11:24:57.227050768Z"
+    description: A Helm chart for installing MetalLB extras, including the BGP speaker
+      and controller
+    digest: d94b24152d8d868ee674ac7d04f8701cee7b3a167e58546fc6d98dc395afce85
+    maintainers:
+    - name: thatmlopsguy
+      url: https://thatmlopsguy.github.io
+    name: metallb-extras
+    type: application
+    urls:
+    - https://github.com/thatmlopsguy/helm-charts/releases/download/metallb-extras-0.1.1/metallb-extras-0.1.1.tgz
+    version: 0.1.1
+  - apiVersion: v2
+    appVersion: 1.16.0
     created: "2025-05-24T09:11:13.085989234Z"
     description: A Helm chart for Kubernetes
     digest: cdc5f798dc800fc90ab9632b0e40c69f52e1b3e3662473e59e833d3d96573177
@@ -163,4 +177,4 @@ entries:
     urls:
     - https://github.com/thatmlopsguy/helm-charts/releases/download/tenant-namespace-0.1.1/tenant-namespace-0.1.1.tgz
     version: 0.1.1
-generated: "2026-04-01T11:24:12.192908737Z"
+generated: "2026-04-01T11:24:57.227076817Z"
