@@ -20,6 +20,10 @@ helm repo update
 
 You can then run `helm search repo thatmlopsguy` to see the current list of available charts.
 
+## Contributing
+
+We'd love to have you contribute! Please refer to our [contribution guidelines](https://github.com/thatmlopsguy/helm-charts/blob/main/CONTRIBUTING.md) for details.
+
 ## License
 
 [Apache License](LICENSE)
