@@ -1,0 +1,20 @@
+kubeVersionOverride: ""
+
+rgds:
+  webapplication:
+    enabled: true
+    securityStandards:
+      enabled: true
+    commonLabels: {}
+  grpcapplication:
+    enabled: false
+  database:
+    enabled: false
+  cache:
+    enabled: false
+  messagequeue:
+    enabled: false
+  eventstream:
+    enabled: false
+  objectstorage:
+    enabled: false

@@ -1,0 +1,325 @@
+{{- if .Values.rgds.webapplication.enabled }}
+apiVersion: kro.run/v1alpha1
+kind: ResourceGraphDefinition
+metadata:
+  name: webapplication
+  labels:
+    app.kubernetes.io/name: webapplication
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/managed-by: helm
+    app.kubernetes.io/version: "{{ .Chart.Version }}"
+    team: platform
+  annotations:
+    description: "Resource Graph Definition for a standard web application deployment"
+spec:
+  schema:
+    apiVersion: v1alpha1
+    kind: WebApplication
+    spec:
+      environment: string | default="production" description="Application environment"
+      team: string | required=true description="Owning team or business unit"
+      name: string | required=true description="Application name"
+      namespace: string | required=true description="Kubernetes namespace"
+      deployment:
+        image: string | required=true description="Container image"
+        tag: string | required=true description="Container image tag"
+        logLevel: string | default="info" description="Logging level"
+        replicas:
+          min: integer | default=1 description="Minimum number of replicas"
+          max: integer | default=3 description="Maximum number of replicas"
+        port: integer | default=8080 description="Container port"
+        resources:
+          requests:
+            cpu:    string | default="100m" description="CPU request"
+            memory: string | default="256Mi" description="Memory request"
+          limits:
+            cpu:    string | default="200m" description="CPU limit"
+            memory: string | default="512Mi" description="Memory limit"
+        livenessProbe:
+            path: string | default="/healthz" description="Liveness probe HTTP path"
+        readinessProbe:
+            path: string | default="/ready" description="Readiness probe HTTP path"
+      configMap:
+        enabled: boolean | default=false description="Enable ConfigMap for environment variables"
+      es:
+        enabled: boolean | default=false description="Enable ExternalSecrets for sensitive configuration"
+      sa:
+        enabled: boolean | default=false description="Enable ServiceAccount"
+      hpa:
+        enabled: boolean | default=false description="Enable Horizontal Pod Autoscaler"
+      keda:
+        enabled: boolean | default=false description="Enable KEDA for event-driven scaling"
+      networkPolicy:
+        enabled: boolean | default=false description="Enable NetworkPolicy to restrict ingress traffic"
+      ingress:
+        enabled: boolean | default=false description="Expose via Ingress"
+        host:    string | required=false description="Ingress host"
+        port:    integer | default=8080 description="Ingress port"
+        clusterIssuer: string | required=false default="letsencrypt-prod" description="Cert-manager cluster issuer"
+      httpRoute:
+        enabled: boolean | default=false description="Expose via HTTPRoute"
+        host:    string | required=false description="HTTPRoute host"
+        port:    integer | default=8080 description="HTTPRoute port"
+    status:
+      deploymentConditions: ${deployment.status.conditions}
+      availableReplicas:    ${deployment.status.availableReplicas}
+      serviceClusterIP:     ${service.spec.clusterIP}
+
+  resources:
+    - id: appNamespace
+      template:
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name:      ${schema.spec.namespace}
+          labels:
+            {{- include "platform.mergedLabels" (dict "name" "${schema.spec.name}" "environment" "${schema.spec.environment}" "team" "${schema.spec.team}" "app" "${schema.spec.name}" "root" .) | nindent 12 }}
+            {{- if .Values.rgds.webapplication.securityStandards.enabled }}
+            {{- include "platform.podSecurityLabels" . | nindent 12 }}
+            {{- end }}
+
+    - id: serviceAccount
+      includeWhen:
+        - ${schema.spec.sa.enabled}
+      template:
+        apiVersion: v1
+        kind: ServiceAccount
+        metadata:
+          name:      ${schema.spec.name}-sa
+          namespace: ${appNamespace.metadata.name}
+          labels:
+            {{- include "platform.mergedLabels" (dict "name" "${schema.spec.name}" "environment" "${schema.spec.environment}" "team" "${schema.spec.team}" "app" "${schema.spec.name}" "root" .) | nindent 12 }}
+
+    - id: configMap
+      includeWhen:
+        - ${schema.spec.configMap.enabled}
+      template:
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name:      ${schema.spec.name}-config
+          namespace: ${appNamespace.metadata.name}
+          labels:
+            {{- include "platform.mergedLabels" (dict "name" "${schema.spec.name}" "environment" "${schema.spec.environment}" "team" "${schema.spec.team}" "app" "${schema.spec.name}" "root" .) | nindent 12 }}
+        data:
+          APP_ENV:   ${schema.spec.environment}
+          LOG_LEVEL: ${schema.spec.deployment.logLevel}
+
+    - id: externalSecrets
+      includeWhen:
+        - ${schema.spec.es.enabled}
+      template:
+        apiVersion: external-secrets.io/v1
+        kind: ExternalSecret
+        metadata:
+          name:      ${schema.spec.name}-secret
+          labels:
+            {{- include "platform.mergedLabels" (dict "name" "${schema.spec.name}" "environment" "${schema.spec.environment}" "team" "${schema.spec.team}" "app" "${schema.spec.name}" "root" .) | nindent 12 }}
+        spec:
+          refreshInterval: 1h
+          secretStoreRef:
+            name: vault-backend
+            kind: ClusterSecretStore
+          target:
+            name: ${configMap.metadata.name}
+            creationPolicy: Owner
+          data:
+            - secretKey: DB_PASSWORD
+              remoteRef:
+                key: prod/db/password
+
+    - id: deployment
+      template:
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name:      ${schema.spec.name}
+          namespace: ${appNamespace.metadata.name}
+          labels:
+            {{- include "platform.mergedLabels" (dict "name" "${schema.spec.name}" "environment" "${schema.spec.environment}" "team" "${schema.spec.team}" "app" "${schema.spec.name}" "root" .) | nindent 12 }}
+        spec:
+          replicas: ${schema.spec.deployment.replicas.min}
+          selector:
+            {{- include "kro-rgds.matchLabels" "${schema.spec.name}" | nindent 12 }}
+          template:
+            metadata:
+              labels:
+                {{- include "platform.mergedLabels" (dict "name" "${schema.spec.name}" "environment" "${schema.spec.environment}" "team" "${schema.spec.team}" "app" "${schema.spec.name}" "root" .) | nindent 16 }}
+            spec:
+              {{- if .Values.rgds.webapplication.securityStandards.enabled }}
+              serviceAccountName: ${serviceAccount.metadata.name}
+              securityContext:
+                runAsNonRoot: true
+                runAsUser:    1000
+                fsGroup:      2000
+                seccompProfile:
+                  type: RuntimeDefault
+              {{- end }}
+              containers:
+                - name: ${schema.spec.name}
+                  image: ${schema.spec.deployment.image}:${schema.spec.deployment.tag}
+                  ports:
+                    - containerPort: ${schema.spec.deployment.port}
+                  {{- if .Values.rgds.webapplication.securityStandards.enabled }}
+                  securityContext:
+                    allowPrivilegeEscalation: false
+                    readOnlyRootFilesystem:   true
+                    capabilities:
+                      drop: ["ALL"]
+                      add: ["NET_BIND_SERVICE"]
+                  {{- end }}
+                  resources:
+                    requests:
+                      cpu:    ${schema.spec.deployment.resources.requests.cpu}
+                      memory: ${schema.spec.deployment.resources.requests.memory}
+                    limits:
+                      cpu:    ${schema.spec.deployment.resources.limits.cpu}
+                      memory: ${schema.spec.deployment.resources.limits.memory}
+                  livenessProbe:
+                    httpGet:
+                      path: ${schema.spec.deployment.livenessProbe.path}
+                      port: ${schema.spec.deployment.port}
+                    initialDelaySeconds: 30
+                    periodSeconds:       10
+                    failureThreshold:    3
+                  readinessProbe:
+                    httpGet:
+                      path: ${schema.spec.deployment.readinessProbe.path}
+                      port: ${schema.spec.deployment.port}
+                    initialDelaySeconds: 5
+                    periodSeconds:       5
+
+    - id: service
+      template:
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name:      ${schema.spec.name}-service
+          namespace: ${appNamespace.metadata.name}
+          labels:
+            {{- include "platform.mergedLabels" (dict "name" "${schema.spec.name}" "environment" "${schema.spec.environment}" "team" "${schema.spec.team}" "app" "${schema.spec.name}" "root" .) | nindent 12 }}
+        spec:
+          selector:
+            app: ${schema.spec.name}
+          ports:
+            - protocol: TCP
+              port:       ${schema.spec.deployment.port}
+              targetPort: ${schema.spec.deployment.port}
+
+    - id: networkPolicy
+      includeWhen:
+        - ${schema.spec.networkPolicy.enabled}
+      template:
+        apiVersion: networking.k8s.io/v1
+        kind: NetworkPolicy
+        metadata:
+          name:      ${schema.spec.name}-netpol
+          namespace: ${appNamespace.metadata.name}
+          labels:
+            {{- include "platform.mergedLabels" (dict "name" "${schema.spec.name}" "environment" "${schema.spec.environment}" "team" "${schema.spec.team}" "app" "${schema.spec.name}" "root" .) | nindent 12 }}
+        spec:
+          podSelector:
+            {{- include "kro-rgds.matchLabels" "${schema.spec.name}" | nindent 12 }}
+          policyTypes:
+            - Ingress
+          ingress:
+            - from:
+                - podSelector:
+                    matchLabels:
+                      app: ingress-nginx
+              ports:
+                - protocol: TCP
+                  port: ${schema.spec.deployment.port}
+
+    - id: hpa
+      includeWhen:
+        - ${schema.spec.hpa.enabled}
+        - ${schema.spec.keda.enabled == false}
+      template:
+        apiVersion: autoscaling/v2
+        kind: HorizontalPodAutoscaler
+        metadata:
+          name:      ${schema.spec.name}-hpa
+          namespace: ${appNamespace.metadata.name}
+          labels:
+            {{- include "platform.mergedLabels" (dict "name" "${schema.spec.name}" "environment" "${schema.spec.environment}" "team" "${schema.spec.team}" "app" "${schema.spec.name}" "root" .) | nindent 12 }}
+        spec:
+          scaleTargetRef:
+            apiVersion: apps/v1
+            kind:       Deployment
+            name:       ${deployment.metadata.name}
+          minReplicas: ${schema.spec.deployment.replicas.min}
+          maxReplicas: ${schema.spec.deployment.replicas.max}
+          metrics:
+            - type: Resource
+              resource:
+                name:               cpu
+                target:
+                  type:             Utilization
+                  averageUtilization: 50
+
+    - id: ingress
+      includeWhen:
+        - ${schema.spec.ingress.enabled}
+        - ${schema.spec.httpRoute.enabled == false}
+      template:
+        apiVersion: networking.k8s.io/v1
+        kind: Ingress
+        metadata:
+          name:      ${schema.spec.name}-ingress
+          namespace: ${appNamespace.metadata.name}
+          labels:
+            {{- include "platform.mergedLabels" (dict "name" "${schema.spec.name}" "environment" "${schema.spec.environment}" "team" "${schema.spec.team}" "app" "${schema.spec.name}" "root" .) | nindent 12 }}
+          annotations:
+            cert-manager.io/cluster-issuer: ${schema.spec.ingress.clusterIssuer}
+            nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+        spec:
+          ingressClassName: nginx
+          tls:
+            - hosts:
+                - ${schema.spec.ingress.host}
+              secretName: ${schema.spec.ingress.host}-tls
+          rules:
+            - host: ${schema.spec.ingress.host}
+              http:
+                paths:
+                  - path: /
+                    pathType: Prefix
+                    backend:
+                      service:
+                        name: ${service.metadata.name}
+                        port:
+                          number: ${schema.spec.ingress.port}
+
+    # - id: httpRoute
+    #   includeWhen:
+    #     - ${schema.spec.httpRoute.enabled}
+    #     - ${schema.spec.ingress.enabled == false}
+    #   template:
+    #     apiVersion: gateway.networking.k8s.io/v1beta1
+    #     kind: HTTPRoute
+    #     metadata:
+    #       name: ${schema.spec.name}-httproute
+    #       namespace: ${appNamespace.metadata.name}
+#            labels:
+# {{/* {{- include "platform.mergedLabels" (dict "name" "${schema.spec.name}" "environment" "${schema.spec.environment}" "team" "${schema.spec.team}" "app" "${schema.spec.name}" "root" .) | nindent 12 }} */}}
+    #     spec:
+    #       # parentRefs should point to an existing Gateway.
+    #       # Adjust `name` and `namespace` to match your Gateway installation.
+    #       parentRefs:
+    #         - name: gateway
+    #           namespace: gateway-system
+    #           group: gateway.networking.k8s.io
+    #           kind: Gateway
+    #       hostnames:
+    #         - ${schema.spec.httpRoute.host}
+    #       rules:
+    #         - matches:
+    #             - path:
+    #                 type: PathPrefix
+    #                 value: /
+    #           backendRefs:
+    #             - name: ${service.metadata.name}
+    #               port: ${schema.spec.httpRoute.port}
+    #               weight: 1
+  {{- end }}
