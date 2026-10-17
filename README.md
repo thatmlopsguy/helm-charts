@@ -1,4 +1,4 @@
-# helm-charts
+# Helm Charts
 
 [![Lint and Test Charts](https://github.com/thatmlopsguy/helm-charts/actions/workflows/ci.yml/badge.svg)](https://github.com/thatmlopsguy/helm-charts/actions/workflows/ci.yml)
 [![Release Charts](https://github.com/thatmlopsguy/helm-charts/actions/workflows/chart-release.yml/badge.svg)](https://github.com/thatmlopsguy/helm-charts/actions/workflows/chart-release.yml)
