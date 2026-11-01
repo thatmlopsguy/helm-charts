@@ -19,3 +19,14 @@ repos:
       - id: helm-docs
         args:
           - --chart-search-root=charts
+  - repo: https://github.com/sirosen/texthooks
+    rev: 1.0.0
+    hooks:
+      - id: alphabetize-codeowners
+      - id: fix-smartquotes
+      - id: fix-ligatures
+  - repo: https://github.com/adrienverge/yamllint.git
+    rev: v1.38.0
+    hooks:
+      - id: yamllint
+        args: [-f, parsable]
